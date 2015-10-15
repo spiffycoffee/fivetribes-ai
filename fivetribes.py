@@ -86,7 +86,7 @@ def score_elder(tile):
 
 # If tile only contains passed in meeple type, put a camel on the tile and return its score
 def camel_points(meeple, tile, meeple_tile):
-	if meeple_tile.replace(meeple, '') == '':
+	if tile[4] == '' and meeple_tile.replace(meeple, '') == '':
 		tile[4] = '+'
 		return tile[0] # tile score
 	return 0
@@ -102,8 +102,9 @@ def calc_tile_score(tile):
 
 
 init_board(test_board)
-test_tile = [9,VILLAGE,0,0,'']
-test_meeple_tile = 'rrr'
+test_tile = [9,VILLAGE,0,0,'+']
+test_meeple_tile = 'rbrr'
 print test_tile
 print camel_points(RED, test_tile, test_meeple_tile)
 print test_tile
+print test_meeple_tile
