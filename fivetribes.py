@@ -1,4 +1,4 @@
-
+from random import randint
 # Boards are represented by a string of tiles, separated with commas
 
 # Tiles definitions have 2 components, always in the following order:
@@ -49,7 +49,7 @@ num_rows = 3
 
 def init_board(t,m):
 	board = []
-
+	
 	# TODO filter out whitespace? make whitespace the deliminator?
 	for tile in t.split(','):
 		board.append({'meeples' : [],
@@ -66,65 +66,72 @@ def init_board(t,m):
 	return board
 
 # for each tile
-def find_moves(board):
+def find_moves(board, n_rows, n_cols):
 	result = []
 	for i, tile in enumerate(board):
 		if tile['meeples']:  
-			result += moves(len(tile['meeples']), i, i, (board, num_rows, num_cols))
+			result += moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
 	print "result:\n%s" % result
 	pretty_print_result(result)
 
-def moves(n, curr_idx, start_idx, board_info):
+def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #	print n
 	if n == 0:  
 		tile_result = check_end_tile(start_idx, curr_idx, board_info) 
+#		tile_result = check_end_tile(board_info[0][start_idx], 
+#									 board_info[0][curr_idx], 
+#									 board_info) 
 #		print tile_result
 		return [(start_idx, curr_idx, tile_result)] if tile_result else []
 	
 	n_rows = board_info[1]
 	n_cols = board_info[2]
 	result = []
-	#TODO can't go backwards
 	# if not top row
-	if curr_idx >= n_cols: 				
+	if curr_idx >= n_cols and prev_dir != 'S' : 				
 		# move up 
-		result += moves(n-1, curr_idx-n_cols, start_idx, board_info)  
+		result += moves(n-1, 'N', curr_idx-n_cols, start_idx, board_info)  
 	# if not right column
-	if curr_idx % n_cols < n_cols-1:
+	if curr_idx % n_cols < n_cols-1 and prev_dir != 'W':
 		# move right 
-		result += moves(n-1, curr_idx+1, start_idx, board_info)  
+		result += moves(n-1, 'E', curr_idx+1, start_idx, board_info)  
 	# if not bottom row
-	if curr_idx < (n_rows-1) * n_cols:	    
+	if curr_idx < (n_rows-1) * n_cols and prev_dir != 'N':	    
 		# move down 
-		result += moves(n-1, curr_idx+n_cols, start_idx, board_info)  
+		result += moves(n-1, 'S', curr_idx+n_cols, start_idx, board_info)  
 	# if not left column
-	if curr_idx % n_cols != 0: 
+	if curr_idx % n_cols != 0 and prev_dir != 'E': 
 		# move left 
-		result += moves(n-1, curr_idx-1, start_idx, board_info)  
+		result += moves(n-1, 'W', curr_idx-1, start_idx, board_info)  
 	return result
 
 # find all tiles that can be moved to 
 #	of those, which are valid (meeple match)	
 #	of those, compute score
 #	highest scoring? save all possible scores?
-def check_end_tile(curr_tile, start_tile, board_info):
-	end_tile = board_info[0][curr_tile]
+def check_end_tile(curr_idx, start_idx, board_info):
+#def check_end_tile(end_tile, start_tile, board_info):
+	end_tile = board_info[0][curr_idx]
+	start_tile = board_info[0][start_idx]
 	
 	if not end_tile['meeples']:
 		return []  # can't end on tile with no meeples
-
+	
 	result = []
-	for m in set(board_info[0][start_tile]['meeples']):
+	#for m in set(board_info[0][start_idx]['meeples']):
+	for m in set(start_tile['meeples']):
 		if m in end_tile['meeples']:
-			result += [m, calc_score(m, end_tile)]
+			result += [m, calc_score(m, curr_idx, board_info)]
 	return result 
 
 
-def calc_score(meeple, tile):
-#	print 'calc_score'
-	return meeple_score(meeple,tile) + tile_score(tile) + camel_score(meeple, tile)
+def calc_score(meeple, curr_idx, board_info):
+	tile = board_info[0][curr_idx]
+	return meeple_score(meeple, curr_idx, board_info) + tile_score(tile) + camel_score(meeple, tile)
 
-def meeple_score(meeple, tile):
+def meeple_score(meeple, curr_idx, board_info):
+	tile = board_info[0][curr_idx]
+
 	# TODO fakirs?
 	if meeple == RED:
 		# Assasin - murder-able tile in range?
@@ -138,7 +145,7 @@ def meeple_score(meeple, tile):
 		return 15
 	elif meeple == BLUE:
 		# Builder - number of blue tiles around this one?
-		return score_builders(tile)	
+		return score_builders(curr_idx, board_info)	
 	elif meeple == WHITE:
 		return 2 * (tile['meeples'].count(WHITE) + 1)    # Each elder is worth 2 points
 	elif meeple == YELLOW:
@@ -147,7 +154,7 @@ def meeple_score(meeple, tile):
 	print 'ERROR - THE TRIBES ARE ANGRY' 
 	return ''
 
-def score_builders(tile):
+def score_builders(curr_idx, board_info):
 	# TODO need whole board to find surrounding tiles?
 	return 10
 
@@ -180,7 +187,7 @@ def tile_score(tile):
 		return 10
 	print 'ERROR - THE DJINNS ARE ANGRY' 
 	return '' 
-	
+
 def pretty_print_board(board, n_rows, n_cols):
 	print '----------------------------'
 	for i, tile in enumerate(board):
@@ -194,9 +201,37 @@ def pretty_print_result(result):
 		#print "S: %i, E: %i, Move: %i" % index_to_coord(, i%num_cols, r[2]
 	print []
 
-
 def index_to_coord(i, n_rows, n_cols):
 	return (i / n_cols, i % n_cols)
+
+def generate_random_board():
+	n_cols = 5
+	n_rows = 6
+	tile_type = [VILLAGE, OASSIS, SACRED_PLACE, HALF_MARKET, FULL_MARKET]
+
+	board = [] 
+	for i in range(n_cols * n_rows):
+		board.append({'meeples' : [],
+						'value': randint(3,12), 
+	 					'type' : tile_type[randint(0,4)], 
+						'trees': 0, 
+						'palaces' : 0, 
+						'camel': ''}) 
+	for i in range(18):	
+		board[randint(0, n_rows * n_cols - 1)]['meeples'] += RED
+	for i in range(18):	
+		board[randint(0, n_rows * n_cols - 1)]['meeples'] += BLUE
+	for i in range(18):	
+		board[randint(0, n_rows * n_cols - 1)]['meeples'] += GREEN
+	for i in range(20):	
+		board[randint(0, n_rows * n_cols - 1)]['meeples'] += WHITE
+	for i in range(16):	
+		board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
+
+	pretty_print_board(board, n_rows, n_cols)
+	#board.append(n_rows)
+	#board.append(n_cols)
+	return board, n_rows, n_cols
 
 #TODO represent meeples, other board state - type of tile, palms & palaces, camels
 #	  represent hand? merchent deck? djinn deck?
@@ -218,4 +253,7 @@ print tile_cleared(RED, test_tile)
 print test_tile
 
 print '\n'
-find_moves(init_board(test_board, test_meeples))
+find_moves(init_board(test_board, test_meeples), num_rows, num_cols)
+
+#b = generate_random_board()
+#find_moves(b[0], b[1], b[2])
