@@ -1,3 +1,4 @@
+from __future__ import print_function
 from random import randint
 # Boards are represented by a string of tiles, separated with commas
 
@@ -52,12 +53,12 @@ def init_board(t,m):
 	
 	# TODO filter out whitespace? make whitespace the deliminator?
 	for tile in t.split(','):
-		board.append({'meeples' : [],
-					 'value': int(tile[:-1]), 
-					 'type' : tile[-1], 
-					 'trees': 0, 
+		board.append({'meeples': [],
+					 'value'   : int(tile[:-1]), 
+					 'type'    : tile[-1], 
+					 'trees'   : 0, 
 					 'palaces' : 0, 
-					 'camel': ''}) 
+					 'camel'   : ''}) 
 	for i, meeples in enumerate(m.split(',')):
 		board[i]['meeples'] = list(meeples)
 	
@@ -71,8 +72,9 @@ def find_moves(board, n_rows, n_cols):
 	for i, tile in enumerate(board):
 		if tile['meeples']:  
 			result += moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
-	print "result:\n%s" % result
-	pretty_print_result(result)
+	# TODO implement pretty print
+	print("result:\n%s" % result)
+	#pretty_print_result(result)
 
 def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #	print n
@@ -151,7 +153,7 @@ def meeple_score(meeple, curr_idx, board_info):
 	elif meeple == YELLOW:
 		# TODO 10pts for everyone with less viziers?
 		return tile['meeples'].count(meeple) + 1 # Each vizier is worth 1 point	
-	print 'ERROR - THE TRIBES ARE ANGRY' 
+	print('ERROR - THE TRIBES ARE ANGRY')
 	return ''
 
 def score_builders(curr_idx, board_info):
@@ -185,21 +187,23 @@ def tile_score(tile):
 	elif (tile['type']) == FULL_MARKET:
 		# TODO return market calculation, enough coins to buy?
 		return 10
-	print 'ERROR - THE DJINNS ARE ANGRY' 
+	print('ERROR - THE DJINNS ARE ANGRY')
 	return '' 
 
 def pretty_print_board(board, n_rows, n_cols):
-	print '----------------------------'
+	print('-'*20)
 	for i, tile in enumerate(board):
-		print (i),
-		print (tile['meeples']),
+		print(" ", i, end=': ')
+		for m in tile['meeples']:
+			print(m, end=''),
+		# print end of row separator
 		if i % n_cols + 1 == n_cols:
-			print '\n------------------------'
+			print('\n'+'-'*20)
 
 def pretty_print_result(result):
 #	for r in result:
 		#print "S: %i, E: %i, Move: %i" % index_to_coord(, i%num_cols, r[2]
-	print []
+	print([])
 
 def index_to_coord(i, n_rows, n_cols):
 	return (i / n_cols, i % n_cols)
@@ -246,13 +250,13 @@ test_tile = {'meeples' : ['r','r','r'],
 			 'trees': 2, 
 			 'palaces': 1, 
 			 'camel': ''}
-print '\n'
-print test_tile
-print camel_score(RED, test_tile)
-print tile_cleared(RED, test_tile)
-print test_tile
+print('\n')
+print(test_tile)
+print(camel_score(RED, test_tile))
+print(tile_cleared(RED, test_tile))
+print(test_tile)
 
-print '\n'
+print('\n')
 find_moves(init_board(test_board, test_meeples), num_rows, num_cols)
 
 #b = generate_random_board()
