@@ -1,5 +1,6 @@
 from __future__ import print_function
-from random import randint
+from random import randint, seed
+#import random
 # Boards are represented by a string of tiles, separated with commas
 
 # Tiles definitions have 2 components, always in the following order:
@@ -63,6 +64,7 @@ def init_board(t,m):
 		board[i]['meeples'] = list(meeples)
 	
 	pretty_print_board(board, num_rows, num_cols)
+	pretty_print_board2(board, num_rows, num_cols)
 #	print board
 	return board
 
@@ -160,12 +162,13 @@ def score_builders(curr_idx, board_info):
 	# TODO need whole board to find surrounding tiles?
 	return 10
 
-def tile_cleared(meeple, tile):
+# returns empty list if all meeples on tile match passed in meeple
+def remaining_meeples(meeple, tile):
 	return [m for m in tile['meeples'] if m != meeple]
 
 # Check if a camel can be placed and compute the score for doing so
 def camel_score(meeple, tile):
-	if tile['camel'] == NO_CAMEL and tile_cleared(meeple, tile):
+	if tile['camel'] == NO_CAMEL and not remaining_meeples(meeple, tile):
 		#tile['camel'] = MY_CAMEL
 		return tile['value'] + 3 * tile['trees'] + 5 * tile['palaces'] 
 	else:
@@ -173,10 +176,10 @@ def camel_score(meeple, tile):
 
 def tile_score(tile):
 	if (tile['type']) == OASSIS:
-		tile['trees'] += 1 
+		#tile['trees'] += 1 
 		return 3 if tile['camel'] == MY_CAMEL else 0
 	elif (tile['type']) == VILLAGE:
-		tile['palaces'] += 1 
+		#tile['palaces'] += 1 
 		return 5 if tile['camel'] == MY_CAMEL else 0
 	elif (tile['type']) == SACRED_PLACE:
 		# TODO return highest value djinn?
@@ -190,15 +193,35 @@ def tile_score(tile):
 	print('ERROR - THE DJINNS ARE ANGRY')
 	return '' 
 
-def pretty_print_board(board, n_rows, n_cols):
-	print('-'*20)
-	for i, tile in enumerate(board):
-		print(" ", i, end=': ')
-		for m in tile['meeples']:
-			print(m, end=''),
-		# print end of row separator
-		if i % n_cols + 1 == n_cols:
-			print('\n'+'-'*20)
+def pretty_print_board2(board, n_rows, n_cols):
+	tile_width = 11
+	width = n_cols * tile_width + 1
+	n = 0
+
+	print('-' * width)
+	for r in range(n_rows):
+		row_tiles = board[r*n_cols:(r+1)*n_cols]
+		print(end='|')
+
+		# print tile header row
+		for tile in row_tiles:
+			values = '('+repr(tile['value'])+')'
+			print('{:2}: {} {}'.format(n, tile['type'], values.rjust(4)), end='|')
+			n += 1
+		print('\n', end='|')
+		
+		# print meeples row
+		for tile in row_tiles:
+			print(''.join(tile['meeples']).center(10), end='|')
+		print('\n', end='|')
+
+		# print tree/palace/camel row
+		for tile in row_tiles:
+			camel = '('+tile['camel']+')'
+			tree_palaces = 't'*tile['trees'] + 'p'*tile['palaces']
+			print('{:6} {}'.format(tree_palaces, camel.rjust(3)), end='|')
+
+		print('\n'+'-' * width)
 
 def pretty_print_result(result):
 #	for r in result:
@@ -208,7 +231,10 @@ def pretty_print_result(result):
 def index_to_coord(i, n_rows, n_cols):
 	return (i / n_cols, i % n_cols)
 
-def generate_random_board():
+def generate_random_board(s):
+	seed(s)
+	print("Generating random board with seed %s" % s)
+
 	n_cols = 5
 	n_rows = 6
 	tile_type = [VILLAGE, OASSIS, SACRED_PLACE, HALF_MARKET, FULL_MARKET]
@@ -232,7 +258,7 @@ def generate_random_board():
 	for i in range(16):	
 		board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
 
-	pretty_print_board(board, n_rows, n_cols)
+	pretty_print_board2(board, n_rows, n_cols)
 	#board.append(n_rows)
 	#board.append(n_cols)
 	return board, n_rows, n_cols
@@ -253,11 +279,21 @@ test_tile = {'meeples' : ['r','r','r'],
 print('\n')
 print(test_tile)
 print(camel_score(RED, test_tile))
-print(tile_cleared(RED, test_tile))
+print(remaining_meeples(RED, test_tile))
 print(test_tile)
+
+print('-'*80)
+print('| 0: OASSIS (12)| 1: o (12)|')
+print('|rrbbbgggwwwwyyy|rrbbb     |')
+#print('|r:10 g:22 b:23 |')
+#print('|   y:32 w:43   |')
+print('|ttttttttppp ( )|t      ( )|')
+print('-'*80)
 
 print('\n')
 find_moves(init_board(test_board, test_meeples), num_rows, num_cols)
 
-#b = generate_random_board()
-#find_moves(b[0], b[1], b[2])
+#b = generate_random_board(randint(0,10000))
+b = generate_random_board(6715)
+find_moves(b[0], b[1], b[2])
+pretty_print_board2(b[0], b[1], b[2])
