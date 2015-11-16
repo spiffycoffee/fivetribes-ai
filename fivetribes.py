@@ -1,6 +1,6 @@
 from __future__ import print_function
 from random import randint, seed
-#import random
+
 # Boards are represented by a string of tiles, separated with commas
 
 # Tiles definitions have 2 components, always in the following order:
@@ -13,7 +13,6 @@ HALF_MARKET   = 'h'  # (3 coin market,  Red)
 FULL_MARKET   = 'f'  # (6 coin market,  Red)
 # ** Each tile type is always Red/Blue, so we do not need to declare color separately
 
-# TODO include palm trees, palaces, camels
 MY_CAMEL = '+'
 OPPONENT_CAMEL = '-'
 NO_CAMEL = ''
@@ -27,6 +26,7 @@ WHITE  = 'w'  # Elders
 YELLOW = 'y'  # Viziers
 # Declare meeple positions and counts with another comma separated string. 
 # Use multiple letters for multiple meeples 
+
 # or take as input diagram?
 # -------------------------
 # | rrgby   |
@@ -63,9 +63,7 @@ def init_board(t,m):
 	for i, meeples in enumerate(m.split(',')):
 		board[i]['meeples'] = list(meeples)
 	
-	pretty_print_board(board, num_rows, num_cols)
 	pretty_print_board2(board, num_rows, num_cols)
-#	print board
 	return board
 
 # for each tile
@@ -73,9 +71,12 @@ def find_moves(board, n_rows, n_cols):
 	result = []
 	for i, tile in enumerate(board):
 		if tile['meeples']:  
-			result += moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
-	# TODO implement pretty print
-	print("result:\n%s" % result)
+			#result += moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
+			#TODO remove meeples from starting tile, deep copy at every recursion?
+			#     instead of n, pass list of meeples?
+			temp = moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
+			print("tile %d:\n%s" % (i, set(temp)))
+	# TODO implement pretty print?
 	#pretty_print_result(result)
 
 def moves(n, prev_dir, curr_idx, start_idx, board_info):
@@ -86,7 +87,7 @@ def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #									 board_info[0][curr_idx], 
 #									 board_info) 
 #		print tile_result
-		return [(start_idx, curr_idx, tile_result)] if tile_result else []
+		return [(curr_idx, r) for r in tile_result] if tile_result else []
 	
 	n_rows = board_info[1]
 	n_cols = board_info[2]
@@ -113,25 +114,28 @@ def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #	of those, which are valid (meeple match)	
 #	of those, compute score
 #	highest scoring? save all possible scores?
+# TODO replace start_idx with list of starting meeple?
 def check_end_tile(curr_idx, start_idx, board_info):
 #def check_end_tile(end_tile, start_tile, board_info):
+	starting_meeples = board_info[0][start_idx]['meeples']
 	end_tile = board_info[0][curr_idx]
-	start_tile = board_info[0][start_idx]
 	
 	if not end_tile['meeples']:
 		return []  # can't end on tile with no meeples
 	
 	result = []
 	#for m in set(board_info[0][start_idx]['meeples']):
-	for m in set(start_tile['meeples']):
+	for m in set(starting_meeples):
 		if m in end_tile['meeples']:
-			result += [m, calc_score(m, curr_idx, board_info)]
+			result += [(m, calc_score(m, curr_idx, board_info))]
 	return result 
 
 
 def calc_score(meeple, curr_idx, board_info):
-	tile = board_info[0][curr_idx]
-	return meeple_score(meeple, curr_idx, board_info) + tile_score(tile) + camel_score(meeple, tile)
+	tile = board_info[0][curr_idx].copy() # shallow copy, ok b/c not changing meeples
+	return meeple_score(meeple, curr_idx, board_info) \
+			+ tile_score(tile) \
+			+ camel_score(meeple, tile)
 
 def meeple_score(meeple, curr_idx, board_info):
 	tile = board_info[0][curr_idx]
@@ -162,24 +166,24 @@ def score_builders(curr_idx, board_info):
 	# TODO need whole board to find surrounding tiles?
 	return 10
 
-# returns empty list if all meeples on tile match passed in meeple
-def remaining_meeples(meeple, tile):
-	return [m for m in tile['meeples'] if m != meeple]
+# returns true if all meeples on tile match passed in meeple 
+def tile_cleared(meeple, tile):
+	return all(m == meeple for m in tile['meeples'])
 
 # Check if a camel can be placed and compute the score for doing so
 def camel_score(meeple, tile):
-	if tile['camel'] == NO_CAMEL and not remaining_meeples(meeple, tile):
-		#tile['camel'] = MY_CAMEL
+	if tile['camel'] == NO_CAMEL and tile_cleared(meeple, tile):
+		tile['camel'] = MY_CAMEL
 		return tile['value'] + 3 * tile['trees'] + 5 * tile['palaces'] 
 	else:
 		return 0
 
 def tile_score(tile):
 	if (tile['type']) == OASSIS:
-		#tile['trees'] += 1 
+		tile['trees'] += 1 
 		return 3 if tile['camel'] == MY_CAMEL else 0
 	elif (tile['type']) == VILLAGE:
-		#tile['palaces'] += 1 
+		tile['palaces'] += 1 
 		return 5 if tile['camel'] == MY_CAMEL else 0
 	elif (tile['type']) == SACRED_PLACE:
 		# TODO return highest value djinn?
@@ -194,7 +198,7 @@ def tile_score(tile):
 	return '' 
 
 def pretty_print_board2(board, n_rows, n_cols):
-	tile_width = 11
+	tile_width = 11 	# min of 10 or alignment breaks
 	width = n_cols * tile_width + 1
 	n = 0
 
@@ -206,20 +210,20 @@ def pretty_print_board2(board, n_rows, n_cols):
 		# print tile header row
 		for tile in row_tiles:
 			values = '('+repr(tile['value'])+')'
-			print('{:2}: {} {}'.format(n, tile['type'], values.rjust(4)), end='|')
+			print('{:2}: {}{}'.format(n, tile['type'], values.rjust(tile_width-6)), end='|')
 			n += 1
 		print('\n', end='|')
 		
 		# print meeples row
 		for tile in row_tiles:
-			print(''.join(tile['meeples']).center(10), end='|')
+			print(''.join(tile['meeples']).center(tile_width-1), end='|')
 		print('\n', end='|')
 
 		# print tree/palace/camel row
 		for tile in row_tiles:
 			camel = '('+tile['camel']+')'
 			tree_palaces = 't'*tile['trees'] + 'p'*tile['palaces']
-			print('{:6} {}'.format(tree_palaces, camel.rjust(3)), end='|')
+			print('{}{}'.format(tree_palaces.center(tile_width-4), camel.rjust(3)), end='|')
 
 		print('\n'+'-' * width)
 
@@ -238,6 +242,7 @@ def generate_random_board(s):
 	n_cols = 5
 	n_rows = 6
 	tile_type = [VILLAGE, OASSIS, SACRED_PLACE, HALF_MARKET, FULL_MARKET]
+	camel_type = [MY_CAMEL] + [OPPONENT_CAMEL] + [NO_CAMEL]*5
 
 	board = [] 
 	for i in range(n_cols * n_rows):
@@ -246,7 +251,8 @@ def generate_random_board(s):
 	 					'type' : tile_type[randint(0,4)], 
 						'trees': 0, 
 						'palaces' : 0, 
-						'camel': ''}) 
+						'camel': camel_type[randint(0,len(camel_type)-1)]
+						}) 
 	for i in range(18):	
 		board[randint(0, n_rows * n_cols - 1)]['meeples'] += RED
 	for i in range(18):	
@@ -259,17 +265,15 @@ def generate_random_board(s):
 		board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
 
 	pretty_print_board2(board, n_rows, n_cols)
-	#board.append(n_rows)
-	#board.append(n_cols)
 	return board, n_rows, n_cols
 
-#TODO represent meeples, other board state - type of tile, palms & palaces, camels
-#	  represent hand? merchent deck? djinn deck?
+#TODO 
 #	  from a given tile, determine moves, valid moves, scoring
+#	  handle looping moves, handle moves that go back to starting tile properly
+#	  represent hand? merchent deck? djinn deck?
 #	  conversely, what are tiles with most potential points (even if not accessible right now)
 
 
-#test_tile = [9,VILLAGE,0,0,'+']
 test_tile = {'meeples' : ['r','r','r'],
 			 'value': 9, 
 			 'type' : VILLAGE, 
@@ -279,7 +283,7 @@ test_tile = {'meeples' : ['r','r','r'],
 print('\n')
 print(test_tile)
 print(camel_score(RED, test_tile))
-print(remaining_meeples(RED, test_tile))
+print(tile_cleared(RED, test_tile))
 print(test_tile)
 
 print('-'*80)
@@ -294,6 +298,7 @@ print('\n')
 find_moves(init_board(test_board, test_meeples), num_rows, num_cols)
 
 #b = generate_random_board(randint(0,10000))
-b = generate_random_board(6715)
-find_moves(b[0], b[1], b[2])
-pretty_print_board2(b[0], b[1], b[2])
+#b = generate_random_board(6715)
+board, n_rows, n_cols = generate_random_board(3492)
+find_moves(board, n_rows, n_cols)
+pretty_print_board2(board, n_rows, n_cols)
