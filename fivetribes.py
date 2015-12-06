@@ -32,23 +32,6 @@ YELLOW = 'y'  # Viziers
 # | rrgby   |
 # | 12o-ctp |
 
-
-test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f,12s,7o,8h"
-test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb,rrbb,rgbyw,rrggbbyyww"
-num_cols = 3
-num_rows = 4
-
-test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f"
-test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb"
-num_cols = 3
-num_rows = 3
-
-#test_board = "3v,5o,6s,2h"
-#test_meeples = "r,r,b,b"
-#num_cols = 2
-#num_rows = 2
-
-
 def init_board(t,m):
 	board = []
 	
@@ -70,22 +53,22 @@ def init_board(t,m):
 def find_moves(board, n_rows, n_cols):
 	result = []
 	for i, tile in enumerate(board):
-		if tile['meeples']:  
-			#result += moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
-			#TODO remove meeples from starting tile, deep copy at every recursion?
-			#     instead of n, pass list of meeples?
-			temp = moves(len(tile['meeples']), '', i, i, (board, n_rows, n_cols))
-			print("tile %d:\n%s" % (i, set(temp)))
-	# TODO implement pretty print?
-	#pretty_print_result(result)
+		temp = gen_moves(i, board, n_rows, n_cols)
+		print("tile %d:\n%s" % (i, set(temp)))
+		# result += temp
+
+def gen_moves(idx, board, n_rows, n_cols):
+	n = num_meeples(board[idx])
+	return moves(n, '', idx, idx, (board, n_rows, n_cols)) if n > 0 else []
+
+# utility method
+def num_meeples(tile):
+	return len(tile['meeples'])
 
 def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #	print n
 	if n == 0:  
 		tile_result = check_end_tile(start_idx, curr_idx, board_info) 
-#		tile_result = check_end_tile(board_info[0][start_idx], 
-#									 board_info[0][curr_idx], 
-#									 board_info) 
 #		print tile_result
 		return [(curr_idx, r) for r in tile_result] if tile_result else []
 	
@@ -114,7 +97,7 @@ def moves(n, prev_dir, curr_idx, start_idx, board_info):
 #	of those, which are valid (meeple match)	
 #	of those, compute score
 #	highest scoring? save all possible scores?
-# TODO replace start_idx with list of starting meeple?
+
 def check_end_tile(curr_idx, start_idx, board_info):
 #def check_end_tile(end_tile, start_tile, board_info):
 	starting_meeples = board_info[0][start_idx]['meeples']
@@ -227,20 +210,10 @@ def pretty_print_board2(board, n_rows, n_cols):
 
 		print('\n'+'-' * width)
 
-def pretty_print_result(result):
-#	for r in result:
-		#print "S: %i, E: %i, Move: %i" % index_to_coord(, i%num_cols, r[2]
-	print([])
-
-def index_to_coord(i, n_rows, n_cols):
-	return (i / n_cols, i % n_cols)
-
-def generate_random_board(s):
+def generate_random_board(s, n_rows, n_cols):
 	seed(s)
 	print("Generating random board with seed %s" % s)
 
-	n_cols = 5
-	n_rows = 6
 	tile_type = [VILLAGE, OASSIS, SACRED_PLACE, HALF_MARKET, FULL_MARKET]
 	camel_type = [MY_CAMEL] + [OPPONENT_CAMEL] + [NO_CAMEL]*5
 
@@ -265,7 +238,10 @@ def generate_random_board(s):
 		board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
 
 	pretty_print_board2(board, n_rows, n_cols)
-	return board, n_rows, n_cols
+	return board
+
+
+
 
 #TODO 
 #	  from a given tile, determine moves, valid moves, scoring
@@ -273,32 +249,26 @@ def generate_random_board(s):
 #	  represent hand? merchent deck? djinn deck?
 #	  conversely, what are tiles with most potential points (even if not accessible right now)
 
+test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f,12s,7o,8h"
+test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb,rrbb,rgbyw,rrggbbyyww"
+num_cols = 3
+num_rows = 4
 
-test_tile = {'meeples' : ['r','r','r'],
-			 'value': 9, 
-			 'type' : VILLAGE, 
-			 'trees': 2, 
-			 'palaces': 1, 
-			 'camel': ''}
-print('\n')
-print(test_tile)
-print(camel_score(RED, test_tile))
-print(tile_cleared(RED, test_tile))
-print(test_tile)
+test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f"
+test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb"
+num_cols = 3
+num_rows = 3
 
-print('-'*80)
-print('| 0: OASSIS (12)| 1: o (12)|')
-print('|rrbbbgggwwwwyyy|rrbbb     |')
-#print('|r:10 g:22 b:23 |')
-#print('|   y:32 w:43   |')
-print('|ttttttttppp ( )|t      ( )|')
-print('-'*80)
+#test_board = "3v,5o,6s,2h"
+#test_meeples = "r,r,b,b"
+#num_cols = 2
+#num_rows = 2
 
-print('\n')
-find_moves(init_board(test_board, test_meeples), num_rows, num_cols)
 
+n_rows = 6
+n_cols = 5
 #b = generate_random_board(randint(0,10000))
 #b = generate_random_board(6715)
-board, n_rows, n_cols = generate_random_board(3492)
+board = generate_random_board(3492, n_rows, n_cols)
 find_moves(board, n_rows, n_cols)
 pretty_print_board2(board, n_rows, n_cols)
