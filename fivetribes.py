@@ -53,14 +53,15 @@ def find_moves(board, n_rows, n_cols):
     result = []
     for i, tile in enumerate(board):
         temp = gen_moves(i, board, n_rows, n_cols)
-        print("tile %d:\n%s" % (i, set(temp)))
+        #print("tile %d:\n%s" % (i, set(temp)))
+        print("tile %d:\n%s" % (i, temp))
         # result += temp
 
 def gen_moves(idx, board, n_rows, n_cols):
-    #n = num_meeples(board[idx])
-    meeples = tile_meeples(board[idx])
-    #return moves(meeples, '', idx, (board, n_rows, n_cols)) if n > 0 else []
-    return moves(meeples, '', idx, (board, n_rows, n_cols))
+    #meeples = tile_meeples(board[idx])
+    #return moves(meeples, '', idx, (board, n_rows, n_cols))
+    n = num_meeples(board[idx])
+    return find_routes(n, '', idx, [], (board, n_rows, n_cols))
 
 # utility method
 def num_meeples(tile):
@@ -69,41 +70,35 @@ def num_meeples(tile):
 def tile_meeples(tile):
     return tile['meeples']
 
-def moves(meeples, prev_dir, curr_idx, board_info):
-    if meeples == []:
-        return []
-    if len(meeples) == 1:  
-    #   if tile has meeple
-        return (idx, meeple)
-        #tile_result = check_end_tile(start_idx, curr_idx, board_info) 
-#       print tile_result
-        #return [(curr_idx, r) for r in tile_result] if tile_result else []
-    
+def find_routes(n, prev_dir, curr_idx, route, board_info):
+    if n <= 0:
+        return [route]
+
     n_rows = board_info[1]
     n_cols = board_info[2]
     result = []
     # if not top row
     if curr_idx >= n_cols and prev_dir != 'S' :                 
+        next_idx = curr_idx - n_cols
         # move up 
-        result += moves(n-1, 'N', curr_idx-n_cols, start_idx, board_info)  
+        result += find_routes(n-1, 'N', next_idx, route + [next_idx], board_info)  
     # if not right column
     if curr_idx % n_cols < n_cols-1 and prev_dir != 'W':
+        next_idx = curr_idx + 1
         # move right 
-        result += moves(n-1, 'E', curr_idx+1, start_idx, board_info)  
+        result += find_routes(n-1, 'E', next_idx, route + [next_idx], board_info)  
     # if not bottom row
     if curr_idx < (n_rows-1) * n_cols and prev_dir != 'N':      
+        next_idx = curr_idx + n_cols
         # move down 
-        result += moves(n-1, 'S', curr_idx+n_cols, start_idx, board_info)  
+        result += find_routes(n-1, 'S', next_idx, route + [next_idx], board_info)  
     # if not left column
     if curr_idx % n_cols != 0 and prev_dir != 'E': 
+        next_idx = curr_idx - 1
         # move left 
-        result += moves(n-1, 'W', curr_idx-1, start_idx, board_info)  
-    return result
+        result += find_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
 
-def permute(list):
-    if len(list) == 1:
-        return list
-    return list[0] + permute(list[1:])
+    return result
 
 # find all tiles that can be moved to 
 #   of those, which are valid (meeple match)    
@@ -208,7 +203,7 @@ def pretty_print_board2(board, n_rows, n_cols):
             print('{:2}: {}{}'.format(n, tile['type'], values.rjust(tile_width-6)), end='|')
             n += 1
         print('\n', end='|')
-        
+
         # print meeples row
         for tile in row_tiles:
             print(''.join(tile['meeples']).center(tile_width-1), end='|')
