@@ -51,24 +51,63 @@ def init_board(t,m):
 # for each tile
 def find_moves(board, n_rows, n_cols):
     result = []
+    route_count = 0
+    move_count = 0
     for i, tile in enumerate(board):
-        temp = gen_moves(i, board, n_rows, n_cols)
-        #print("tile %d:\n%s" % (i, set(temp)))
-        print("tile %d:\n%s" % (i, temp))
+       # if i < 5 : # TODO temp
+            print("tile %d:" % i) 
+            routes = find_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
+            moves = gen_moves(routes, tile, board)
+
+            #print("%s" % routes) # print all found routes
+            #print("%s" % moves) # print all found moves
+            route_count += len(routes)
+            move_count += len(moves)
         # result += temp
+    print("Routes found: %d" % (route_count))
+    print("Moves found: %d" % (move_count))
 
-def gen_moves(idx, board, n_rows, n_cols):
-    #meeples = tile_meeples(board[idx])
-    #return moves(meeples, '', idx, (board, n_rows, n_cols))
-    n = num_meeples(board[idx])
-    return find_routes(n, '', idx, [], (board, n_rows, n_cols))
+def gen_moves(routes, start_tile, board):
+    moves = []
+    for route in routes: 
+        if route:
+            end_tile = board[route[-1]]
+            for meeple in set(end_tile['meeples']):
+                if meeple in (start_tile['meeples']):
+                    # generate meeple permutations for route
+                    #print("%s" % route) 
+                    moves += permute_meeples_over_route(route, start_tile['meeples'], meeple)
+                    #temp = permute_meeples_over_route(route, start_tile['meeples'], meeple)
+                    #print(temp)
+                    #moves += temp
+    #print(moves)
+    return moves
 
-# utility method
+def permute_meeples_over_route(route, meeples, end_meeple):
+    meeples = copy_and_remove(meeples, end_meeple)
+    return [zip(route, p + [end_meeple]) for p in permute_meeples(meeples, [], len(meeples))]
+
+def permute_meeples(remainder, result, n):
+    if not remainder or n == 0:
+        #print("done: %s" % remainder)
+        return [result]
+    else:
+        total = []
+        for r in set(remainder):
+            #print("remainder: %s" % remainder)
+            copy_remainder = copy_and_remove(remainder, r)
+            total += permute_meeples(copy_remainder, result + [r], n-1)
+        return total
+
+# returns a shallow copy of a list with the given item removed
+def copy_and_remove(a_list, item):
+    copy_list = list(a_list)
+    copy_list.remove(item)
+    return copy_list
+
+# returns number of meeples on a given tile
 def num_meeples(tile):
     return len(tile['meeples'])
-
-def tile_meeples(tile):
-    return tile['meeples']
 
 def find_routes(n, prev_dir, curr_idx, route, board_info):
     if n <= 0:
@@ -97,7 +136,6 @@ def find_routes(n, prev_dir, curr_idx, route, board_info):
         next_idx = curr_idx - 1
         # move left 
         result += find_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
-
     return result
 
 # find all tiles that can be moved to 
@@ -203,7 +241,7 @@ def pretty_print_board2(board, n_rows, n_cols):
             print('{:2}: {}{}'.format(n, tile['type'], values.rjust(tile_width-6)), end='|')
             n += 1
         print('\n', end='|')
-
+        
         # print meeples row
         for tile in row_tiles:
             print(''.join(tile['meeples']).center(tile_width-1), end='|')
