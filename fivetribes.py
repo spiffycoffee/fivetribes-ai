@@ -1,5 +1,6 @@
 from __future__ import print_function
 from random import randint, seed
+import time
 
 # Boards are represented by a string of tiles, separated with commas
 
@@ -51,24 +52,32 @@ def init_board(t,m):
 # for each tile
 def find_moves(board, n_rows, n_cols):
     result = []
-    route_count = 0
-    move_count = 0
+    tot_route_count = 0
+    tot_move_count = 0
     for i, tile in enumerate(board):
        # if i < 5 : # TODO temp
             print("tile %d:" % i) 
             routes = find_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
-            moves = gen_moves(routes, tile, board)
+            #moves = gen_moves(routes, tile, board)
+            move_count = 0
+            for m in gen_moves(routes, tile, board):
+                # TODO acutally do something with moves
+                move_count += 1
+                if move_count < 10:
+                    print(m)
 
             #print("%s" % routes) # print all found routes
             #print("%s" % moves) # print all found moves
-            route_count += len(routes)
-            move_count += len(moves)
-        # result += temp
-    print("Routes found: %d" % (route_count))
-    print("Moves found: %d" % (move_count))
+            print("Routes found: %d" % (len(routes)))
+            print("Moves found: %d" % (move_count))
+            tot_move_count += move_count
+            tot_route_count += len(routes)
+    print("Total Routes found: %d" % (tot_route_count))
+    print("Total Moves found: %d" % (tot_move_count))
 
 def gen_moves(routes, start_tile, board):
     moves = []
+    cache = {'r':[], 'g':[], 'b':[], 'y':[], 'w':[]}
     for route in routes: 
         if route:
             end_tile = board[route[-1]]
@@ -76,16 +85,26 @@ def gen_moves(routes, start_tile, board):
                 if meeple in (start_tile['meeples']):
                     # generate meeple permutations for route
                     #print("%s" % route) 
-                    moves += permute_meeples_over_route(route, start_tile['meeples'], meeple)
+                    #moves += permute_meeples_over_route(route, start_tile['meeples'], meeple)
+                    for p in permute_meeples_over_route(route, start_tile['meeples'], meeple, cache):
+                        yield p
                     #temp = permute_meeples_over_route(route, start_tile['meeples'], meeple)
                     #print(temp)
                     #moves += temp
     #print(moves)
-    return moves
+    #return moves
 
-def permute_meeples_over_route(route, meeples, end_meeple):
+def permute_meeples_over_route(route, meeples, end_meeple, cache):
+    if cache[end_meeple]:
+        return cache[end_meeple]
+
     meeples = copy_and_remove(meeples, end_meeple)
-    return [zip(route, p + [end_meeple]) for p in permute_meeples(meeples, [], len(meeples))]
+    meeple_route = [zip(route, p + [end_meeple]) for p in permute_meeples(meeples, [], len(meeples))]
+    cache[end_meeple] = meeple_route
+    print(len(meeple_route))
+    return meeple_route
+    #for p in permute_meeples(meeples, [], len(meeples)):
+    #    yield zip(route, p + [end_meeple])
 
 def permute_meeples(remainder, result, n):
     if not remainder or n == 0:
@@ -312,8 +331,12 @@ num_rows = 3
 
 n_rows = 6
 n_cols = 5
-#b = generate_random_board(randint(0,10000))
+start_time = time.time()
 #b = generate_random_board(6715)
-board = generate_random_board(3492, n_rows, n_cols)
+#board = generate_random_board(randint(0,10000), n_rows, n_cols)
+#board = generate_random_board(3492, n_rows, n_cols)
+#board = generate_random_board(47, n_rows, n_cols) # 3 million!
+board = generate_random_board(6557, n_rows, n_cols) # memory error :-\
 find_moves(board, n_rows, n_cols)
+print("Run time: %s" % (time.time() - start_time))
 pretty_print_board2(board, n_rows, n_cols)
