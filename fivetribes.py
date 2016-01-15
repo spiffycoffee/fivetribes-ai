@@ -1,6 +1,6 @@
 from __future__ import print_function
 from random import randint, seed
-import time
+from itertools import izip
 
 # Boards are represented by a string of tiles, separated with commas
 
@@ -55,7 +55,7 @@ def find_moves(board, n_rows, n_cols):
     tot_route_count = 0
     tot_move_count = 0
     for i, tile in enumerate(board):
-       # if i < 5 : # TODO temp
+        #if i < 5 : # TODO temp
             print("tile %d:" % i) 
             routes = find_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
             #moves = gen_moves(routes, tile, board)
@@ -63,8 +63,8 @@ def find_moves(board, n_rows, n_cols):
             for m in gen_moves(routes, tile, board):
                 # TODO acutally do something with moves
                 move_count += 1
-                if move_count < 10:
-                    print(m)
+                #if move_count < 10:
+                    #print(list(m))
 
             #print("%s" % routes) # print all found routes
             #print("%s" % moves) # print all found moves
@@ -76,35 +76,35 @@ def find_moves(board, n_rows, n_cols):
     print("Total Moves found: %d" % (tot_move_count))
 
 def gen_moves(routes, start_tile, board):
-    moves = []
+    #TODO {key: [] for key in MEEPLES}
     cache = {'r':[], 'g':[], 'b':[], 'y':[], 'w':[]}
     for route in routes: 
         if route:
+            #print("Trying route: %s" % route) 
             end_tile = board[route[-1]]
-            for meeple in set(end_tile['meeples']):
-                if meeple in (start_tile['meeples']):
-                    # generate meeple permutations for route
-                    #print("%s" % route) 
-                    #moves += permute_meeples_over_route(route, start_tile['meeples'], meeple)
-                    for p in permute_meeples_over_route(route, start_tile['meeples'], meeple, cache):
-                        yield p
-                    #temp = permute_meeples_over_route(route, start_tile['meeples'], meeple)
-                    #print(temp)
-                    #moves += temp
-    #print(moves)
-    #return moves
+            for meeple in matching_meeples(start_tile['meeples'], end_tile['meeples']):
+                # generate meeple permutations for route
+                #print("End meeple: %s" % meeple) 
+                for p in permute_meeples_over_route(route, start_tile['meeples'], meeple, cache):
+                    yield p
+                #permute_meeples_over_route(route, start_tile['meeples'], meeple, cache))
+
+def matching_meeples(a, b):
+    return list(set(a) & set(b))
 
 def permute_meeples_over_route(route, meeples, end_meeple, cache):
     if cache[end_meeple]:
-        return cache[end_meeple]
-
-    meeples = copy_and_remove(meeples, end_meeple)
-    meeple_route = [zip(route, p + [end_meeple]) for p in permute_meeples(meeples, [], len(meeples))]
-    cache[end_meeple] = meeple_route
-    print(len(meeple_route))
-    return meeple_route
-    #for p in permute_meeples(meeples, [], len(meeples)):
-    #    yield zip(route, p + [end_meeple])
+        #return [izip(route, p + [end_meeple]) for p in cache[end_meeple]]
+        for p in cache[end_meeple]:
+            yield izip(route, p + [end_meeple])
+    else: 
+        meeples = copy_and_remove(meeples, end_meeple)
+        permutations = permute_meeples(meeples, [], len(meeples))
+        cache[end_meeple] = permutations 
+        print("Permuting %s, length %s" % (end_meeple, len(permutations)))
+        #return [izip(route, p + [end_meeple]) for p in permutations]
+        for p in permutations:
+            yield izip(route, p + [end_meeple])
 
 def permute_meeples(remainder, result, n):
     if not remainder or n == 0:
@@ -306,37 +306,50 @@ def generate_random_board(s, n_rows, n_cols):
 
 
 
-
-#TODO 
-#     from a given tile, determine moves, valid moves, scoring
-#     handle looping moves, handle moves that go back to starting tile properly
-#     represent hand? merchent deck? djinn deck?
-#     conversely, what are tiles with most potential points (even if not accessible right now)
-
-test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f,12s,7o,8h"
-test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb,rrbb,rgbyw,rrggbbyyww"
-num_cols = 3
-num_rows = 4
-
-test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f"
-test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb"
-num_cols = 3
-num_rows = 3
-
-#test_board = "3v,5o,6s,2h"
-#test_meeples = "r,r,b,b"
-#num_cols = 2
-#num_rows = 2
+if __name__ == '__main__':
+    #TODO 
+    #from a given tile, determine moves, valid moves, scoring
+    #handle looping moves, handle moves that go back to starting tile properly
+    #represent hand? merchent deck? djinn deck?
+    #conversely, what are tiles with most potential points (even if not accessible right now)
 
 
-n_rows = 6
-n_cols = 5
-start_time = time.time()
-#b = generate_random_board(6715)
-#board = generate_random_board(randint(0,10000), n_rows, n_cols)
-#board = generate_random_board(3492, n_rows, n_cols)
-#board = generate_random_board(47, n_rows, n_cols) # 3 million!
-board = generate_random_board(6557, n_rows, n_cols) # memory error :-\
-find_moves(board, n_rows, n_cols)
-print("Run time: %s" % (time.time() - start_time))
-pretty_print_board2(board, n_rows, n_cols)
+    test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f,12s,7o,8h"
+    test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb,rrbb,rgbyw,rrggbbyyww"
+    num_cols = 3
+    num_rows = 4
+
+    test_board = "3v,5o,6s,2h,11f,3s,13o,5h,7f"
+    test_meeples = "r,g,b,y,w,rgb,yw,rr,rrb"
+    num_cols = 3
+    num_rows = 3
+
+    #test_board = "3v,5o,6s,2h"
+    #test_meeples = "r,r,b,b"
+    #num_cols = 2
+    #num_rows = 2
+
+    n_rows = 6
+    n_cols = 5
+        
+    import time
+    start_time = time.time()
+    #b = generate_random_board(6715)
+    #board = generate_random_board(randint(0,10000), n_rows, n_cols)
+    #board = generate_random_board(3492, n_rows, n_cols)
+    #board = generate_random_board(47, n_rows, n_cols) # 3 million!
+    board = generate_random_board(6557, n_rows, n_cols) # 10 million :O
+    #find_moves(board, n_rows, n_cols)
+    print("Run time: %s" % (time.time() - start_time))
+    pretty_print_board2(board, n_rows, n_cols)
+
+    import cProfile
+    cProfile.run('find_moves(board, n_rows, n_cols)')
+
+    # Test scaffolding
+    a = [1,2,3,4]
+    b = ['a','b','c','d']
+    start_time = time.time()
+    #for i in range(10000000):
+    #    zip(a, b)
+    #print("Run time: %s" % (time.time() - start_time))
