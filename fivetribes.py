@@ -49,25 +49,25 @@ def init_board(t,m):
     pretty_print_board2(board, num_rows, num_cols)
     return board
 
-# for each tile
 def find_moves(board, n_rows, n_cols):
     result = []
     tot_route_count = 0
     tot_move_count = 0
     for i, tile in enumerate(board):
-        #if i < 5 : # TODO temp
+        #if i == 4 : # TODO temp
             print("tile %d:" % i) 
-            routes = find_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
-            #moves = gen_moves(routes, tile, board)
+            routes = gen_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
             move_count = 0
-            for m in gen_moves(routes, tile, board):
+            for move in gen_moves(routes, tile, board):
                 # TODO acutally do something with moves
                 move_count += 1
-                #if move_count < 10:
-                    #print(list(m))
+                meeple = move[-1][1]
+                end_idx = move[-1][0]
+                score = calc_score(meeple, end_idx, (board, n_rows, n_cols))
+                if move_count % 100000 == 1:
+                    print(list(move))
+                    print("score: %d, tile: %s, %s " % (score, end_idx, meeple))
 
-            #print("%s" % routes) # print all found routes
-            #print("%s" % moves) # print all found moves
             print("Routes found: %d" % (len(routes)))
             print("Moves found: %d" % (move_count))
             tot_move_count += move_count
@@ -81,11 +81,12 @@ def gen_moves(routes, start_tile, board):
     for route in routes: 
         if route:
             #print("Trying route: %s" % route) 
-            end_tile = board[route[-1]]
-            for meeple in matching_meeples(start_tile['meeples'], end_tile['meeples']):
+            a = start_tile['meeples']
+            b = board[route[-1]]['meeples']
+            for meeple in matching_meeples(a, b):
                 # generate meeple permutations for route
                 #print("End meeple: %s" % meeple) 
-                for p in permute_meeples_over_route(route, start_tile['meeples'], meeple, cache):
+                for p in permute_meeples_over_route(route, a, meeple, cache):
                     yield p
                 #permute_meeples_over_route(route, start_tile['meeples'], meeple, cache))
 
@@ -96,7 +97,8 @@ def permute_meeples_over_route(route, meeples, end_meeple, cache):
     if cache[end_meeple]:
         #return [izip(route, p + [end_meeple]) for p in cache[end_meeple]]
         for p in cache[end_meeple]:
-            yield izip(route, p + [end_meeple])
+            #yield izip(route, p + [end_meeple])
+            yield zip(route, p + [end_meeple])
     else: 
         meeples = copy_and_remove(meeples, end_meeple)
         permutations = permute_meeples(meeples, [], len(meeples))
@@ -104,7 +106,8 @@ def permute_meeples_over_route(route, meeples, end_meeple, cache):
         print("Permuting %s, length %s" % (end_meeple, len(permutations)))
         #return [izip(route, p + [end_meeple]) for p in permutations]
         for p in permutations:
-            yield izip(route, p + [end_meeple])
+            #yield izip(route, p + [end_meeple])
+            yield zip(route, p + [end_meeple])
 
 def permute_meeples(remainder, result, n):
     if not remainder or n == 0:
@@ -128,7 +131,7 @@ def copy_and_remove(a_list, item):
 def num_meeples(tile):
     return len(tile['meeples'])
 
-def find_routes(n, prev_dir, curr_idx, route, board_info):
+def gen_routes(n, prev_dir, curr_idx, route, board_info):
     if n <= 0:
         return [route]
 
@@ -139,44 +142,28 @@ def find_routes(n, prev_dir, curr_idx, route, board_info):
     if curr_idx >= n_cols and prev_dir != 'S' :                 
         next_idx = curr_idx - n_cols
         # move up 
-        result += find_routes(n-1, 'N', next_idx, route + [next_idx], board_info)  
+        result += gen_routes(n-1, 'N', next_idx, route + [next_idx], board_info)  
     # if not right column
     if curr_idx % n_cols < n_cols-1 and prev_dir != 'W':
         next_idx = curr_idx + 1
         # move right 
-        result += find_routes(n-1, 'E', next_idx, route + [next_idx], board_info)  
+        result += gen_routes(n-1, 'E', next_idx, route + [next_idx], board_info)  
     # if not bottom row
     if curr_idx < (n_rows-1) * n_cols and prev_dir != 'N':      
         next_idx = curr_idx + n_cols
         # move down 
-        result += find_routes(n-1, 'S', next_idx, route + [next_idx], board_info)  
+        result += gen_routes(n-1, 'S', next_idx, route + [next_idx], board_info)  
     # if not left column
     if curr_idx % n_cols != 0 and prev_dir != 'E': 
         next_idx = curr_idx - 1
         # move left 
-        result += find_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
+        result += gen_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
     return result
 
 # find all tiles that can be moved to 
 #   of those, which are valid (meeple match)    
 #   of those, compute score
 #   highest scoring? save all possible scores?
-
-def check_end_tile(curr_idx, start_idx, board_info):
-#def check_end_tile(end_tile, start_tile, board_info):
-    starting_meeples = board_info[0][start_idx]['meeples']
-    end_tile = board_info[0][curr_idx]
-    
-    if not end_tile['meeples']:
-        return []  # can't end on tile with no meeples
-    
-    result = []
-    #for m in set(board_info[0][start_idx]['meeples']):
-    for m in set(starting_meeples):
-        if m in end_tile['meeples']:
-            result += [(m, calc_score(m, curr_idx, board_info))]
-    return result 
-
 
 def calc_score(meeple, curr_idx, board_info):
     tile = board_info[0][curr_idx].copy() # shallow copy, ok b/c not changing meeples
@@ -197,7 +184,7 @@ def meeple_score(meeple, curr_idx, board_info):
         # Merchant - what's up for grabs? (not full amount grab-able...)
         #            what's in your hand?
         #            how far along are you in your sets,etc
-        return 15
+        return 5 * (tile['meeples'].count(GREEN) + 1)
     elif meeple == BLUE:
         # Builder - number of blue tiles around this one?
         return score_builders(curr_idx, board_info) 
