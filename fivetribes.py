@@ -1,6 +1,8 @@
 from __future__ import print_function
-from random import randint, seed
+from random import randint, seed, shuffle
 from itertools import izip
+from sys import maxint
+#from copy import deepcopy
 
 # Boards are represented by a string of tiles, separated with commas
 
@@ -46,52 +48,78 @@ def init_board(t,m):
     for i, meeples in enumerate(m.split(',')):
         board[i]['meeples'] = list(meeples)
     
-    pretty_print_board2(board, num_rows, num_cols)
+    pretty_print_board2((board, num_rows, num_cols))
     return board
 
-def find_moves(board, n_rows, n_cols):
-    result = []
+def find_moves(board_info):
     tot_route_count = 0
     tot_move_count = 0
+    board = board_info[0]
     for i, tile in enumerate(board):
         #if i == 4 : # TODO temp
-            print("tile %d:" % i) 
-            routes = gen_routes(num_meeples(tile), '', i, [], (board, n_rows, n_cols))
+            #print("tile %d:" % i) 
+            routes = gen_routes(num_meeples(tile), '', i, [], board_info)
             move_count = 0
             for move in gen_moves(routes, tile, board):
-                # TODO acutally do something with moves
                 move_count += 1
-                meeple = move[-1][1]
-                end_idx = move[-1][0]
-                score = calc_score(meeple, end_idx, (board, n_rows, n_cols))
-                if move_count % 100000 == 1:
-                    print(list(move))
-                    print("score: %d, tile: %s, %s " % (score, end_idx, meeple))
+                yield [(i, '')] + move
 
-            print("Routes found: %d" % (len(routes)))
-            print("Moves found: %d" % (move_count))
+                #score = calc_score(move, board_info)
+                #if move_count % 100000 == 1:
+                #    print(list(move))
+                #    print("score: %d" % score)
+
+            #print("Routes found: %d" % (len(routes)))
+            #print("Moves found: %d" % (move_count))
             tot_move_count += move_count
             tot_route_count += len(routes)
     print("Total Routes found: %d" % (tot_route_count))
     print("Total Moves found: %d" % (tot_move_count))
 
+def gen_routes(n, prev_dir, curr_idx, route, board_info):
+    if n <= 0:
+        return [route] if route else []
+
+    n_rows = board_info[1]
+    n_cols = board_info[2]
+    result = []
+    # if not top row
+    if curr_idx >= n_cols and prev_dir != 'S' :                 
+        next_idx = curr_idx - n_cols
+        # move up 
+        result += gen_routes(n-1, 'N', next_idx, route + [next_idx], board_info)  
+    # if not right column
+    if curr_idx % n_cols < n_cols-1 and prev_dir != 'W':
+        next_idx = curr_idx + 1
+        # move right 
+        result += gen_routes(n-1, 'E', next_idx, route + [next_idx], board_info)  
+    # if not bottom row
+    if curr_idx < (n_rows-1) * n_cols and prev_dir != 'N':      
+        next_idx = curr_idx + n_cols
+        # move down 
+        result += gen_routes(n-1, 'S', next_idx, route + [next_idx], board_info)  
+    # if not left column
+    if curr_idx % n_cols != 0 and prev_dir != 'E': 
+        next_idx = curr_idx - 1
+        # move left 
+        result += gen_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
+    return result
+
 def gen_moves(routes, start_tile, board):
     #TODO {key: [] for key in MEEPLES}
     cache = {'r':[], 'g':[], 'b':[], 'y':[], 'w':[]}
     for route in routes: 
-        if route:
-            #print("Trying route: %s" % route) 
-            a = start_tile['meeples']
-            b = board[route[-1]]['meeples']
-            for meeple in matching_meeples(a, b):
-                # generate meeple permutations for route
-                #print("End meeple: %s" % meeple) 
-                for p in permute_meeples_over_route(route, a, meeple, cache):
-                    yield p
-                #permute_meeples_over_route(route, start_tile['meeples'], meeple, cache))
+        #print("Trying route: %s" % route) 
+        start = start_tile['meeples']
+        end = board[route[-1]]['meeples']
+        for meeple in matching_meeples(start, end):
+            # generate meeple permutations for route
+            #print("End meeple: %s" % meeple) 
+            for move in permute_meeples_over_route(route, start, meeple, cache):
+                yield move
 
-def matching_meeples(a, b):
-    return list(set(a) & set(b))
+def matching_meeples(start, end):
+    return list(set(start) & set(end))
 
 def permute_meeples_over_route(route, meeples, end_meeple, cache):
     if cache[end_meeple]:
@@ -103,7 +131,7 @@ def permute_meeples_over_route(route, meeples, end_meeple, cache):
         meeples = copy_and_remove(meeples, end_meeple)
         permutations = permute_meeples(meeples, [], len(meeples))
         cache[end_meeple] = permutations 
-        print("Permuting %s, length %s" % (end_meeple, len(permutations)))
+        #print("Permuting %s, length %s" % (end_meeple, len(permutations)))
         #return [izip(route, p + [end_meeple]) for p in permutations]
         for p in permutations:
             #yield izip(route, p + [end_meeple])
@@ -131,78 +159,72 @@ def copy_and_remove(a_list, item):
 def num_meeples(tile):
     return len(tile['meeples'])
 
-def gen_routes(n, prev_dir, curr_idx, route, board_info):
-    if n <= 0:
-        return [route]
-
-    n_rows = board_info[1]
-    n_cols = board_info[2]
-    result = []
-    # if not top row
-    if curr_idx >= n_cols and prev_dir != 'S' :                 
-        next_idx = curr_idx - n_cols
-        # move up 
-        result += gen_routes(n-1, 'N', next_idx, route + [next_idx], board_info)  
-    # if not right column
-    if curr_idx % n_cols < n_cols-1 and prev_dir != 'W':
-        next_idx = curr_idx + 1
-        # move right 
-        result += gen_routes(n-1, 'E', next_idx, route + [next_idx], board_info)  
-    # if not bottom row
-    if curr_idx < (n_rows-1) * n_cols and prev_dir != 'N':      
-        next_idx = curr_idx + n_cols
-        # move down 
-        result += gen_routes(n-1, 'S', next_idx, route + [next_idx], board_info)  
-    # if not left column
-    if curr_idx % n_cols != 0 and prev_dir != 'E': 
-        next_idx = curr_idx - 1
-        # move left 
-        result += gen_routes(n-1, 'W', next_idx, route + [next_idx], board_info)  
-    return result
-
 # find all tiles that can be moved to 
 #   of those, which are valid (meeple match)    
 #   of those, compute score
 #   highest scoring? save all possible scores?
 
-def calc_score(meeple, curr_idx, board_info):
-    tile = board_info[0][curr_idx].copy() # shallow copy, ok b/c not changing meeples
-    return meeple_score(meeple, curr_idx, board_info) \
+def calc_score(meeple, idx, board_info):
+    tile = board_info[0][idx]
+    return meeple_score(meeple, tile, idx, board_info) \
             + tile_score(tile) \
             + camel_score(meeple, tile)
 
-def meeple_score(meeple, curr_idx, board_info):
-    tile = board_info[0][curr_idx]
+def meeple_score(meeple, tile, idx, board_info):
+    meeple_count = end_tile_match(meeple, tile['meeples'])
 
     # TODO fakirs?
     if meeple == RED:
         # Assasin - murder-able tile in range?
         #           kiling vizier knocks their count below yours?
         #           elders?
-        return 10
+        return score_assassins(idx, board_info)
     elif meeple == GREEN:
         # Merchant - what's up for grabs? (not full amount grab-able...)
         #            what's in your hand?
         #            how far along are you in your sets,etc
-        return 5 * (tile['meeples'].count(GREEN) + 1)
+        return 5 * meeple_count
     elif meeple == BLUE:
         # Builder - number of blue tiles around this one?
-        return score_builders(curr_idx, board_info) 
+        return score_builders(meeple_count, idx, board_info) 
     elif meeple == WHITE:
-        return 2 * (tile['meeples'].count(WHITE) + 1)    # Each elder is worth 2 points
+        return 2 * meeple_count    # Each elder is worth 2 points
     elif meeple == YELLOW:
         # TODO 10pts for everyone with less viziers?
-        return tile['meeples'].count(meeple) + 1 # Each vizier is worth 1 point 
+        return meeple_count     # Each vizier is worth 1 point 
     print('ERROR - THE TRIBES ARE ANGRY')
     return ''
 
-def score_builders(curr_idx, board_info):
-    # TODO need whole board to find surrounding tiles?
+def end_tile_match(meeple, tile_meeples):
+    initial_count = len(tile_meeples)
+    filter_matches = [m for m in tile_meeples if m != meeple]
+    tile_meeples = filter_matches
+    return initial_count - len(filter_matches)
+
+    count = 0
+    while True:
+        try:
+            tile_meeples.remove(meeple)
+            count += 1
+        except ValueError:
+            #print("count: %s" % count)
+            return count
+        
+
+def score_assassins(idx, board_info):
+    #TODO 
     return 10
+
+def score_builders(meeple_count, curr_idx, board_info):
+    # TODO need whole board to find surrounding tiles?
+    return meeple_count * 4 
 
 # returns true if all meeples on tile match passed in meeple 
 def tile_cleared(meeple, tile):
-    return all(m == meeple for m in tile['meeples'])
+    for m in tile['meeples']:
+        if m != meeple:
+            return False
+    return True
 
 # Check if a camel can be placed and compute the score for doing so
 def camel_score(meeple, tile):
@@ -221,7 +243,7 @@ def tile_score(tile):
         return 5 if tile['camel'] == MY_CAMEL else 0
     elif (tile['type']) == SACRED_PLACE:
         # TODO return highest value djinn?
-        return 10
+        return 8 
     elif (tile['type']) == HALF_MARKET:
         # TODO return market calculation, enough coins to buy?
         return 5
@@ -231,8 +253,106 @@ def tile_score(tile):
     print('ERROR - THE DJINNS ARE ANGRY')
     return '' 
 
-def pretty_print_board2(board, n_rows, n_cols):
-    tile_width = 11     # min of 10 or alignment breaks
+def minimax(depth, board_info):
+    if depth == 0:
+        # TODO do we need static evaluator? how should we scale its value
+        return 0
+
+    board = board_info[0]
+    max_score = -maxint - 1  # negative infinity
+    for move in find_moves(board_info):
+        #print("move %s: " % move)
+        #pretty_print_board2(board_info)
+        starting_meeples = board[move[0][0]]['meeples']
+        copied_end_tile = copy_tile(board[move[-1][0]])
+        make_move(move, board)
+        #pretty_print_board2(board_info)
+
+        score = calc_score(move[-1][1], move[-1][0], board_info) \
+                - minimax(depth - 1, board_info)
+
+        #pretty_print_board2(board_info)
+        unmake_move(move, board, starting_meeples, copied_end_tile)
+        #pretty_print_board2(board_info)
+        #raw_input()
+
+        if (score > max_score):
+            print("better score: %s" % score)
+            max_score = score
+    return max_score
+
+def alphabeta(depth, board_info, alpha, beta, max_node):
+    if depth == 0:
+        # TODO do we need static evaluator? how should we scale its value
+        return 0
+
+    board = board_info[0]
+    if max_node:
+        v = -maxint - 1  # negative infinity
+        for move in find_moves(board_info):
+            starting_meeples = board[move[0][0]]['meeples']
+            copied_end_tile = copy_tile(board[move[-1][0]])
+            make_move(move, board)
+
+            score = calc_score(move[-1][1], move[-1][0], board_info) \
+                    + alphabeta(depth - 1, board_info, alpha, beta, False)
+
+            unmake_move(move, board, starting_meeples, copied_end_tile)
+
+            v = max(v, score)
+            alpha = max(alpha, v)
+            if (beta <= alpha):
+                print("beta cut-off")
+                break 
+        return v
+    else:
+        v = maxint # positive infinity
+        for move in find_moves(board_info):
+            starting_meeples = board[move[0][0]]['meeples']
+            copied_end_tile = copy_tile(board[move[-1][0]])
+            make_move(move, board)
+
+            score = -calc_score(move[-1][1], move[-1][0], board_info) \
+                    + alphabeta(depth - 1, board_info, alpha, beta, True)
+
+            unmake_move(move, board, starting_meeples, copied_end_tile)
+
+            v = min(v, score)
+            beta = min(beta, v)
+            if (alpha >= beta):
+                #print("alpha cut-off")
+                break 
+        return v
+
+def copy_tile(tile):
+    # deep copying manually because deepcopy() was slow
+    # only the meeples array needs to be deep copied, the rest is primitives 
+    saved_tile = tile.copy() 
+    saved_tile['meeples'] = tile['meeples'][:] 
+    return saved_tile
+
+def make_move(move, board):
+    board[move[0][0]]['meeples'] = []
+
+    for idx, meeple in move[1:]:
+        board[idx]['meeples'] += meeple
+
+def unmake_move(move, board, starting_meeples, end_tile):
+    for idx, meeple in move[1:-1]:
+        try:
+            board[idx]['meeples'].remove(meeple)
+        except ValueError:
+            #print(move)
+            #pretty_print_board2(board_info)
+            #raw_input() 
+            pass    # if meeple was already removed (e.g. by assassin) do nothing
+
+    board[move[0][0]]['meeples'] = starting_meeples
+    board[move[-1][0]] = end_tile
+
+def pretty_print_board2(board_info):
+    board, n_rows, n_cols = board_info
+    tile_width = 11     # min of 10, below that alignment will break
     width = n_cols * tile_width + 1
     n = 0
 
@@ -288,9 +408,32 @@ def generate_random_board(s, n_rows, n_cols):
     for i in range(16): 
         board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
 
-    pretty_print_board2(board, n_rows, n_cols)
+    pretty_print_board2((board, n_rows, n_cols))
     return board
 
+def generate_starting_board(s, n_rows, n_cols):
+    seed(s)
+    print("Generating starting board with seed %s" % s)
+
+    tile_type = [VILLAGE, OASSIS, SACRED_PLACE, HALF_MARKET, FULL_MARKET]
+    bag_of_meeples = list((RED + BLUE + GREEN) * 18 + WHITE * 20 + YELLOW * 16)
+    shuffle(bag_of_meeples)
+
+    board = [] 
+    for i in range(n_cols * n_rows):
+        board.append({'meeples' : [],
+                        'value': randint(3,12), 
+                        'type' : tile_type[randint(0,4)], 
+                        'trees': 0, 
+                        'palaces' : 0, 
+                        'camel': NO_CAMEL
+                        }) 
+        for _ in range(3):
+            board[i]['meeples'] += bag_of_meeples.pop()
+
+    pretty_print_board2((board, n_rows, n_cols))
+    #raw_input()
+    return board
 
 
 if __name__ == '__main__':
@@ -322,16 +465,23 @@ if __name__ == '__main__':
     import time
     start_time = time.time()
     #b = generate_random_board(6715)
+    #board = generate_starting_board(randint(0,10000), n_rows, n_cols)
+    board = generate_starting_board(1100, n_rows, n_cols)
     #board = generate_random_board(randint(0,10000), n_rows, n_cols)
     #board = generate_random_board(3492, n_rows, n_cols)
+    #board = generate_random_board(6845, n_rows, n_cols) # 1 million
     #board = generate_random_board(47, n_rows, n_cols) # 3 million!
-    board = generate_random_board(6557, n_rows, n_cols) # 10 million :O
+    #board = generate_random_board(6557, n_rows, n_cols) # 10 million :O
     #find_moves(board, n_rows, n_cols)
     print("Run time: %s" % (time.time() - start_time))
-    pretty_print_board2(board, n_rows, n_cols)
+    #pretty_print_board2((board, n_rows, n_cols))
 
     import cProfile
-    cProfile.run('find_moves(board, n_rows, n_cols)')
+    #cProfile.run('find_moves((board, n_rows, n_cols))')
+    board_info = (board, n_rows, n_cols)
+    ply = 3
+    cProfile.run('print("best score: %s" % minimax(ply, board_info))')
+    #cProfile.run('print("best score: %s" % alphabeta(ply, board_info, -maxint, maxint, True))')
 
     # Test scaffolding
     a = [1,2,3,4]
@@ -339,4 +489,4 @@ if __name__ == '__main__':
     start_time = time.time()
     #for i in range(10000000):
     #    zip(a, b)
-    #print("Run time: %s" % (time.time() - start_time))
+    #print("Run time: %s" % (time.time() - start_time))   if depth == 0:
