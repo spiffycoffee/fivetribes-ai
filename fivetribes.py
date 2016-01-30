@@ -48,7 +48,7 @@ def init_board(t,m):
     for i, meeples in enumerate(m.split(',')):
         board[i]['meeples'] = list(meeples)
     
-    pretty_print_board2((board, num_rows, num_cols))
+    pretty_print_board2(board, num_rows, num_cols)
     return board
 
 def find_moves(board_info):
@@ -256,37 +256,40 @@ def tile_score(tile):
 def minimax(depth, board_info):
     if depth == 0:
         # TODO do we need static evaluator? how should we scale its value
-        return 0
+        return 0, []
 
     board = board_info[0]
+    best_move = []
     max_score = -maxint - 1  # negative infinity
     for move in find_moves(board_info):
         #print("move %s: " % move)
-        #pretty_print_board2(board_info)
+        pretty_print_board2(*board_info)
         starting_meeples = board[move[0][0]]['meeples']
         copied_end_tile = copy_tile(board[move[-1][0]])
         make_move(move, board)
-        #pretty_print_board2(board_info)
+        #pretty_print_board2(*board_info)
 
         score = calc_score(move[-1][1], move[-1][0], board_info) \
-                - minimax(depth - 1, board_info)
+                - minimax(depth - 1, board_info)[0]
 
-        #pretty_print_board2(board_info)
+        #pretty_print_board2(*board_info)
         unmake_move(move, board, starting_meeples, copied_end_tile)
-        #pretty_print_board2(board_info)
+        #pretty_print_board2(*board_info)
         #raw_input()
 
         if (score > max_score):
             print("better score: %s" % score)
             max_score = score
-    return max_score
+            best_move = move
+    return max_score, best_move
 
 def alphabeta(depth, board_info, alpha, beta, max_node):
     if depth == 0:
         # TODO do we need static evaluator? how should we scale its value
-        return 0
+        return 0, []
 
     board = board_info[0]
+    best_move = []
     if max_node:
         v = -maxint - 1  # negative infinity
         for move in find_moves(board_info):
@@ -295,16 +298,19 @@ def alphabeta(depth, board_info, alpha, beta, max_node):
             make_move(move, board)
 
             score = calc_score(move[-1][1], move[-1][0], board_info) \
-                    + alphabeta(depth - 1, board_info, alpha, beta, False)
+                    + alphabeta(depth - 1, board_info, alpha, beta, False)[0]
 
             unmake_move(move, board, starting_meeples, copied_end_tile)
 
-            v = max(v, score)
+            #v = max(v, score)
+            if score > v:
+                v = score
+                best_move = move
             alpha = max(alpha, v)
-            if (beta <= alpha):
-                print("beta cut-off")
+            if beta <= alpha:
+                #print("beta cut-off")
                 break 
-        return v
+        return v, best_move
     else:
         v = maxint # positive infinity
         for move in find_moves(board_info):
@@ -313,16 +319,19 @@ def alphabeta(depth, board_info, alpha, beta, max_node):
             make_move(move, board)
 
             score = -calc_score(move[-1][1], move[-1][0], board_info) \
-                    + alphabeta(depth - 1, board_info, alpha, beta, True)
+                    + alphabeta(depth - 1, board_info, alpha, beta, True)[0]
 
             unmake_move(move, board, starting_meeples, copied_end_tile)
 
-            v = min(v, score)
+            #v = min(v, score)
+            if score < v:
+                v = score
+                best_move = move
             beta = min(beta, v)
-            if (alpha >= beta):
+            if alpha >= beta:
                 #print("alpha cut-off")
                 break 
-        return v
+        return v, best_move
 
 def copy_tile(tile):
     # deep copying manually because deepcopy() was slow
@@ -341,17 +350,17 @@ def unmake_move(move, board, starting_meeples, end_tile):
     for idx, meeple in move[1:-1]:
         try:
             board[idx]['meeples'].remove(meeple)
+            #board[idx]['meeples'].replace(meeple)
         except ValueError:
             #print(move)
-            #pretty_print_board2(board_info)
+            #pretty_print_board2(*board_info)
             #raw_input() 
             pass    # if meeple was already removed (e.g. by assassin) do nothing
 
     board[move[0][0]]['meeples'] = starting_meeples
     board[move[-1][0]] = end_tile
 
-def pretty_print_board2(board_info):
-    board, n_rows, n_cols = board_info
+def pretty_print_board2(board, n_rows, n_cols):
     tile_width = 11     # min of 10, below that alignment will break
     width = n_cols * tile_width + 1
     n = 0
@@ -408,7 +417,7 @@ def generate_random_board(s, n_rows, n_cols):
     for i in range(16): 
         board[randint(0, n_rows * n_cols - 1)]['meeples'] += YELLOW
 
-    pretty_print_board2((board, n_rows, n_cols))
+    pretty_print_board2(board, n_rows, n_cols)
     return board
 
 def generate_starting_board(s, n_rows, n_cols):
@@ -421,7 +430,7 @@ def generate_starting_board(s, n_rows, n_cols):
 
     board = [] 
     for i in range(n_cols * n_rows):
-        board.append({'meeples' : [],
+        board.append({'meeples' : '',
                         'value': randint(3,12), 
                         'type' : tile_type[randint(0,4)], 
                         'trees': 0, 
@@ -431,7 +440,7 @@ def generate_starting_board(s, n_rows, n_cols):
         for _ in range(3):
             board[i]['meeples'] += bag_of_meeples.pop()
 
-    pretty_print_board2((board, n_rows, n_cols))
+    pretty_print_board2(board, n_rows, n_cols)
     #raw_input()
     return board
 
@@ -474,14 +483,14 @@ if __name__ == '__main__':
     #board = generate_random_board(6557, n_rows, n_cols) # 10 million :O
     #find_moves(board, n_rows, n_cols)
     print("Run time: %s" % (time.time() - start_time))
-    #pretty_print_board2((board, n_rows, n_cols))
+    #pretty_print_board2(board, n_rows, n_cols)
 
     import cProfile
     #cProfile.run('find_moves((board, n_rows, n_cols))')
     board_info = (board, n_rows, n_cols)
-    ply = 3
-    cProfile.run('print("best score: %s" % minimax(ply, board_info))')
-    #cProfile.run('print("best score: %s" % alphabeta(ply, board_info, -maxint, maxint, True))')
+    ply = 2
+    cProfile.run('print("best score: %d, %s" % minimax(ply, board_info))')
+    cProfile.run('print("best score: %d, %s" % alphabeta(ply, board_info, -maxint, maxint, True))')
 
     # Test scaffolding
     a = [1,2,3,4]
