@@ -1,8 +1,6 @@
 from __future__ import print_function
 from random import randint, seed, shuffle
-from itertools import izip
 from sys import maxint
-#from copy import deepcopy
 
 # Boards are represented by a string of tiles, separated with commas
 
@@ -34,6 +32,31 @@ YELLOW = 'y'  # Viziers
 # | rrgby   |
 # | 12o-ctp |
 
+    #board = []
+    #n_rows = 0
+    #n_cols = 0
+    #merchant_deck = []
+    #djinn_deck = []
+    #player_hands = []
+
+# decorator to count function calls, slow :(
+def count(func):
+    def count_closure(*args, **kwargs):
+        count_closure.count += 1
+        return func(*args, **kwargs)
+    count_closure.count = 0
+    return count_closure
+
+class TableTop(object):
+    def __init__(self, **kwargs):
+        self.board = kwargs.get('board', [])
+        self.n_cols = kwargs.get('n_cols', 1)
+        self.n_rows = len(self.board) / self.n_cols
+        self.merchant_deck = kwargs.get('merchant_deck', [])
+        self.djinn_deck = kwargs.get('djinn_deck', [])
+        self.player_hands = kwargs.get('player_hands', [])
+
+
 def init_board(t,m):
     board = []
     
@@ -51,7 +74,7 @@ def init_board(t,m):
     pretty_print_board2(board, num_rows, num_cols)
     return board
 
-def find_moves(board_info):
+def gen_moves(board_info):
     tot_route_count = 0
     tot_move_count = 0
     board = board_info[0]
@@ -60,31 +83,28 @@ def find_moves(board_info):
         cache = {'r':[], 'g':[], 'b':[], 'y':[], 'w':[]}
         route_count = 0
         for route in gen_routes(idx, board_info):
-            route_count += 1
             #print("Trying route: %s" % route) 
-            start_meeples = board[route[0]]['meeples']
-            end_meeples = board[route[-1]]['meeples']
+            route_count += 1
             move_count = 0
-            #for move in gen_moves(route, start_meeples, end_meeples, cache):
-            # TODO if valid route...
-            for meeple in matching_meeples(start_meeples, end_meeples):
-                # generate meeple permutations for route
-                #print("End meeple: %s" % meeple) 
-                for move in permute_meeples_over_route(route, start_meeples, meeple, cache):
-                    move_count += 1
-                    yield move
-
-                #score = calc_score(move, board_info)
-                #if move_count % 100000 == 1:
-                #    print(list(move))
-                #    print("score: %d" % score)
-
-            #print("Routes found: %d" % (len(routes)))
-            #print("Moves found: %d" % (move_count))
+            for move in permute_meeples_over_route(route, board, cache):
+                #print("move %s" % move)
+                move_count += 1
+                yield move
+    
             tot_move_count += move_count
         tot_route_count += route_count
     print("Total Routes found: %d" % (tot_route_count))
     print("Total Moves found: %d" % (tot_move_count))
+
+def valid_end_meeples(route, board):
+    start_idx = route[0]
+    end_idx = route[-1]
+    if start_idx == end_idx:
+        return [] # route stopping on starting tile confuses meeple matcher
+    
+    starting_meeples = board[start_idx]['meeples']
+    ending_meeples = board[end_idx]['meeples']
+    return list(set(starting_meeples) & set(ending_meeples))
 
 def gen_routes(idx, board_info):
     n_meeples = num_meeples(board_info[0][idx])
@@ -124,18 +144,18 @@ def _gen_routes(n, prev_dir, curr_idx, route, board_info):
         result += _gen_routes(n-1, 'W', next_idx, route+[next_idx], board_info)  
     return result
 
-def matching_meeples(start, end):
-    return list(set(start) & set(end))
+def permute_meeples_over_route(route, board, cache):
+    starting_meeples = board[route[0]]['meeples']
+    #print("starting_meeples %s" % starting_meeples)
+    for end_meeple in valid_end_meeples(route, board):
+        if not cache[end_meeple]:
+            meeples = copy_and_remove(starting_meeples, end_meeple)
+            permutations = permute_meeples(meeples, [], len(meeples))
+            cache[end_meeple] = permutations 
+            #print("Permuting %s, length %s" % (end_meeple, len(permutations)))
 
-def permute_meeples_over_route(route, meeples, end_meeple, cache):
-    if not cache[end_meeple]:
-        meeples = copy_and_remove(meeples, end_meeple)
-        permutations = permute_meeples(meeples, [], len(meeples))
-        cache[end_meeple] = permutations 
-        #print("Permuting %s, length %s" % (end_meeple, len(permutations)))
-
-    for p in cache[end_meeple]:
-        yield zip(route, [''] + p + [end_meeple])
+        for p in cache[end_meeple]:
+            yield zip(route, [''] + p + [end_meeple])
 
 def permute_meeples(remainder, result, n):
     if not remainder or n == 0:
@@ -151,7 +171,7 @@ def permute_meeples(remainder, result, n):
 
 # returns a shallow copy of a list with the given item removed
 def copy_and_remove(a_list, item):
-    copy_list = list(a_list)
+    copy_list = a_list[:]
     copy_list.remove(item)
     return copy_list
 
@@ -250,7 +270,7 @@ def minimax(depth, board_info):
     board = board_info[0]
     best_move = []
     max_score = -maxint - 1  # negative infinity
-    for move in find_moves(board_info):
+    for move in gen_moves(board_info):
         #print("move %s: " % move)
         #pretty_print_board2(*board_info)
         starting_meeples = board[move[0][0]]['meeples']
@@ -281,7 +301,7 @@ def alphabeta(depth, board_info, net_score, alpha, beta, max_node):
     best_move = []
     if max_node:
         v = -maxint - 1  # negative infinity
-        for move in find_moves(board_info):
+        for move in gen_moves(board_info):
             #print("max move %s: " % move)
             starting_meeples = board[move[0][0]]['meeples']
             copied_end_tile = copy_tile(board[move[-1][0]])
@@ -307,7 +327,7 @@ def alphabeta(depth, board_info, net_score, alpha, beta, max_node):
         return v, best_move
     else:
         v = maxint # positive infinity
-        for move in find_moves(board_info):
+        for move in gen_moves(board_info):
             #print("min move %s: " % move)
             starting_meeples = board[move[0][0]]['meeples']
             copied_end_tile = copy_tile(board[move[-1][0]])
@@ -458,7 +478,6 @@ def generate_starting_board(s, n_rows, n_cols):
 
     return board
 
-
 if __name__ == '__main__':
     #TODO 
     #from a given tile, determine moves, valid moves, scoring
@@ -482,8 +501,8 @@ if __name__ == '__main__':
     #num_cols = 2
     #num_rows = 2
 
-    n_rows = 6
     n_cols = 5
+    n_rows = 6
         
     import time
     start_time = time.time()
@@ -495,22 +514,21 @@ if __name__ == '__main__':
     #board = generate_random_board(6845, n_rows, n_cols) # 1 million
     #board = generate_random_board(47, n_rows, n_cols) # 3 million!
     #board = generate_random_board(6557, n_rows, n_cols) # 10 million :O
-    #find_moves(board, n_rows, n_cols)
-    board_info = (board, n_rows, n_cols)
+    #gen_moves(board, n_rows, n_cols)
+    tt = TableTop(board=board, n_cols=n_cols)
+    board_info = (tt.board, tt.n_rows, tt.n_cols)
+    #board_info = (board, n_rows, n_cols)
     pretty_print_board2(*board_info)
     print("Run time: %s" % (time.time() - start_time))
 
+
     import cProfile
-    #cProfile.run('find_moves((board, n_rows, n_cols))')
+    #cProfile.run('gen_moves((board, n_rows, n_cols))')
     ply = 3
     #cProfile.run('print("best score: %d, %s" % minimax(ply, board_info))')
     cProfile.run('print("best score: %d, %s" % alphabeta(ply, board_info, 0, -maxint, maxint, True))')
 
     pretty_print_board2(*board_info)
+
     # Test scaffolding
-    a = [1,2,3,4]
-    b = ['a','b','c','d']
-    start_time = time.time()
-    #for i in range(10000000):
-    #    zip(a, b)
-    #print("Run time: %s" % (time.time() - start_time))   if depth == 0:
+    ##print("Run time: %s" % (time.time() - start_time))   if depth == 0:
