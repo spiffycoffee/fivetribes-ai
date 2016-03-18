@@ -45,13 +45,17 @@ FISH    = 7
 WHEAT   = 8
 POTTERY = 9 
 
+# Lookup array for scoring Merchant Sets
+#   index represents the set length
+#   e.g. 2 card set = 3 pts, 3 card set = 7 pts, etc.
+score_merchant_set = [0, 1, 3, 7, 13, 21, 30, 40, 50, 60]
 
     #board = []
     #n_rows = 0
     #n_cols = 0
     #merchant_deck = []
     #djinn_deck = []
-    #player_hands = []
+    #player = []
 
 # decorator to count function calls, slow :(
 def count(func):
@@ -68,8 +72,9 @@ class TableTop(object):
         self.n_rows = len(self.board) / self.n_cols
         self.merchant_deck = kwargs.get('merchant_deck', [])
         self.djinn_deck = kwargs.get('djinn_deck', [])
-        self.player_hands = kwargs.get('player_hands', [])
+        self.player = kwargs.get('player', [])
 
+    # TODO remove
     def __deepcopy__(self):
         copy = TableTop()
         copy.board = list(self.board)
@@ -82,6 +87,7 @@ class TableTop(object):
         copy.djinn_deck = list(self.djinn_deck)
         return copy
 
+    # TODO remove
     def save_state(self, move_start, move_end):
         #copy = TableTop(board=TableTop.board)
         copy = TableTop()
@@ -95,15 +101,23 @@ class TableTop(object):
         copied_end_tile = copy_tile(self.board[move_end])
         return (copy, starting_meeples, copied_end_tile)
 
+    # TODO remove
     def load_state(self, state):
         self.merchant_deck = state.merchant_deck
         self.djinn_deck = state.djinn_deck
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
 
     def __repr__(self):
         #TODO make this return strings
         pretty_print_board2(self.board, self.n_rows, self.n_cols)
         print("merchant %s" % self.merchant_deck)
         print("djinn %s" % self.djinn_deck)
+        print("player %s" % self.player)
         return ''
 
     def board_info(self):
@@ -232,32 +246,35 @@ def num_meeples(tile):
     return len(tile['meeples'])
 
 # calculate the score of matching a number of meeples on a tile
-#def calc_score(meeple, meeple_count, idx, board_info):
-def calc_score(last_step, meeple_count, tt):
-    #tile = board_info[0][idx]
+def calc_score(last_step, meeple_count, undo_stack, tt):
     idx, meeple = last_step
     tile = tt.board[idx]
-    return meeple_score(meeple, meeple_count, idx, tt) \
-            + tile_score(tile, tt) \
-            + camel_score(meeple, tile)
+    return meeple_score(meeple, meeple_count, idx, undo_stack, tt) \
+            + tile_score(tile, undo_stack, tt) \
+            + camel_score(meeple, tile, undo_stack)
 
-#def meeple_score(meeple, tile, idx, board_info):
-def meeple_score(meeple, meeple_count, idx, tt):
+def meeple_score(meeple, meeple_count, idx, undo_stack, tt):
     #meeple_count = end_tile_match(meeple, tile['meeples'])
-    print(meeple, tt.board[idx])
-    raw_input()
-
+    #print(meeple, tt.board[idx])
+    #raw_input()
+    
     # TODO fakirs?
     if meeple == RED:
         # Assasin - murder-able tile in range?
         #           kiling vizier knocks their count below yours?
         #           elders?
-        return score_assassins(meeple_count, idx, tt)
+        return score_assassins(meeple_count, idx, undo_stack, tt)
     elif meeple == GREEN:
         # Merchant - what's up for grabs? (not full amount grab-able...)
-        #            what's in your hand?
-        #            how far along are you in your sets,etc
-        return 5 * meeple_count
+        # TODO undo merchant deck changes, player hand / fakirs
+        #return 5 * meeple_count
+
+        undo_stack.append((0, tt, 'merchant_deck', tt.merchant_deck[:]))
+        score = 0
+        for _ in xrange(meeple_count):
+            card = tt.merchant_deck.pop()
+            score += score_merchants(card, tt.player[1], undo_stack) # TODO actual player
+        return score
     elif meeple == BLUE:
         return score_builders(meeple_count, idx, tt) 
     elif meeple == WHITE:
@@ -268,9 +285,54 @@ def meeple_score(meeple, meeple_count, idx, tt):
     else:
         raise ValueError('Not a valid meeple type: %s' % meeple) 
 
-def score_assassins(meeple_count, idx, tt):
-    #TODO 
-    return 10
+def score_assassins(meeple_count, idx, undo_stack, tt):
+    max_score = 0
+    for tile in tt.board:
+        if len(tile['meeples']) == 1 and tile['camel'] == '':
+            undo_stack.append((0, tile, 'meeples', tile['meeples']))
+            undo_stack.append((0, tile, 'camel', ''))
+            tile['meeples'] = [] 
+            tile['camel'] = MY_CAMEL
+            #print(tt)
+            #raw_input('assasinating: %s' % tile)
+            return tile['value']
+    
+    # TODO only assasinate in range, pick best scoring, assassinate viziers?
+            # if tile in assasin range
+            if tile['value'] > max_score:
+                max_score = tile['value']
+                # do assasination, how to undo?
+    return max_score 
+
+def score_merchants(card, player, undo_stack):
+    # TODO test undo moves
+    if card == 0:  # fakir
+        undo_stack.append((0, player, 'fakirs', player['fakirs']))
+        player['fakirs'] += 1
+        return 0
+
+    player_sets = player['merchant_sets']
+    for i, set_ in enumerate(player_sets):
+        if card not in set_:
+            undo_stack.append((0, player_sets, i, set(set_)))
+            set_.add(card)
+            return score_merchant_set[len(set_)]
+
+    # no existing sets / card already in all existing sets
+    undo_stack.append((1, player, 'merchant_sets'))
+    player_sets.append(set([card]))
+    return 1
+
+def set_size(card, merchant_sets):
+    """ returns the size of the largest set that doesn't contain the card """
+    if card == 0:  # fakir
+        return 0
+
+    for set_ in merchant_sets:
+        if card not in set_:
+            return len(set_)
+    return 0 
+    
 
 def score_builders(meeple_count, idx, tt):
     # TODO precompute surrounding blue tiles for whole board
@@ -278,6 +340,9 @@ def score_builders(meeple_count, idx, tt):
     return meeple_count * surrounding_blues 
 
 def blue_tiles(i, tt):
+    def is_blue_tile(tile):
+        return tile['type'] == VILLAGE or tile['type'] == SACRED_PLACE
+    
     left       = i - 1
     center     = i
     right      = i + 1
@@ -287,7 +352,7 @@ def blue_tiles(i, tt):
     on_right   = right % n_cols == 0
     on_top_row = center+top < 0
     on_bot_row = center+bot >= len(tt.board)
-
+    
     blues = 0
     # check a given tile and its 8 neighbors (less if on an edge) 
     if not on_top_row:
@@ -312,31 +377,88 @@ def blue_tiles(i, tt):
             blues += 1
     return blues
 
-def is_blue_tile(tile):
-    return tile['type'] == VILLAGE or tile['type'] == SACRED_PLACE
-
-
-
-def tile_score(tile, tt):
+def tile_score(tile, undo_stack, tt):
     tile_type = tile['type']
-    if (tile_type) == OASSIS:
+    if tile_type == OASSIS:
+        undo_stack.append((0, tile, 'trees', tile['trees']))
         tile['trees'] += 1 
         return 3 if tile['camel'] == MY_CAMEL else 0
-    elif (tile_type) == VILLAGE:
+
+    elif tile_type == VILLAGE:
+        undo_stack.append((0, tile, 'palaces', tile['palaces']))
         tile['palaces'] += 1 
         return 5 if tile['camel'] == MY_CAMEL else 0
-    elif (tile_type) == SACRED_PLACE:
-        # TODO return highest value djinn?
-        #return max(tt.djinn_deck[:-3])
-        return 8 
-    elif (tile_type) == HALF_MARKET:
+
+    elif tile_type == SACRED_PLACE:
+        return score_sacred_place(undo_stack, tt)
+        #return max(tt.djinn_deck[-3:])
+        #return 8 
+
+    elif tile_type == HALF_MARKET:
         # TODO return market calculation, enough coins to buy?
-        return 5
-    elif (tile_type) == FULL_MARKET:
+        #return 5
+        #return 1
+
+        player_hand = tt.player[1]
+        half_market = tt.merchant_deck[-3:]
+        _, idx = best_cards(half_market, player_hand['merchant_sets'])[0]
+        undo_stack.append((0, tt, 'merchant_deck', tt.merchant_deck[:]))
+        card = tt.merchant_deck.pop(idx-3)
+        return score_merchants(card, player_hand, undo_stack)
+
+#        best_card = None
+#        best_set = 0
+#        for card in tt.merchant_deck[-3:]:
+#            s = set_size(card, tt.player[1]['merchant_sets']) # TODO actual player
+#            if s > best_set: 
+#                best_card = card
+#                best_set = s
+#        return score_merchants(best_card, tt.player[1], undo_stack) 
+
+    elif tile_type == FULL_MARKET:
         # TODO return market calculation, enough coins to buy?
-        return 10
+        #return 10
+        #return 2
+
+        player_hand = tt.player[1]
+        full_market = tt.merchant_deck[-6:]
+
+        top_2_cards = best_cards(full_market, player_hand['merchant_sets'])[:2]
+        # if necessary, rearrange results so popping won't make the indexes invalid
+        if top_2_cards[0][1] > top_2_cards[1][1]:
+            top_2_cards[0], top_2_cards[1] = top_2_cards[1], top_2_cards[0]
+
+        undo_stack.append((0, tt, 'merchant_deck', tt.merchant_deck[:]))
+        score = 0
+        for _, idx in top_2_cards:
+            #print(tt.merchant_deck)
+            card = tt.merchant_deck.pop(idx-6)
+            score += score_merchants(card, player_hand, undo_stack)
+        return score
+
     else:
         raise ValueError('Not a valid tile type: %s' % tile_type) 
+
+def best_cards(merchant_cards, player_sets):
+    score = [(set_size(merchant_cards[i], player_sets), i) for i in xrange(len(merchant_cards))]
+    score.sort(reverse=True) 
+    return score
+#    return sorted(score, reverse=True)
+    #return [score[i][1] for i in xrange(n)] # return index of top n cards
+
+def score_sacred_place(undo_stack, tt):
+    # TODO player has enough elders / fakirs
+    idx = len(tt.djinn_deck)-1 # index of end of list
+    best_score = 0
+    for i in xrange(idx, idx-3, -1):  # first 3 cards on the deck
+        if tt.djinn_deck[i] > best_score:
+            best_score = tt.djinn_deck[i]
+            idx = i
+    
+    # TODO re-insert popped card instead of replacing whole thing?
+    undo_stack.append((0, tt, 'djinn_deck', tt['djinn_deck'][:]))
+    tt.djinn_deck.pop(idx)
+    return best_score
 
 # returns true if all meeples on tile match passed in meeple 
 # TODO remove 
@@ -347,10 +469,12 @@ def tile_cleared(meeple, tile):
     return True
 
 # Check if a camel can be placed and compute the score for doing so
-def camel_score(meeple, tile):
-    if tile['camel'] == NO_CAMEL and tile_cleared(meeple, tile):
+def camel_score(meeple, tile, undo_stack):
+    #if tile['camel'] == NO_CAMEL and tile_cleared(meeple, tile):
+    if tile['camel'] == NO_CAMEL and not tile['meeples']:
+        undo_stack.append((0, tile, 'camel', ''))
         tile['camel'] = MY_CAMEL
-        #raw_input()
+        #raw_input(tile)
         return tile['value'] + 3 * tile['trees'] + 5 * tile['palaces'] 
     else:
         return 0
@@ -364,40 +488,43 @@ def minimax(depth, tt):
     max_score = -maxint - 1  # negative infinity
     for move in gen_moves(tt.board_info()):
         #board = board_info[0]
-        #debug = True
+        undo_stack = []
+        debug = True
         debug = False
         if(debug):
             print("move %s: " % move)
-            #print(tt)
-            print(TT)
+            print(tt)
 
         #starting_meeples = tt.board[move[0][0]]['meeples']
         #copied_end_tile = copy_tile(tt.board[move[-1][0]])
         #save_state = tt.fast_copy()
-        save_state = tt.save_state(move[0][0], move[-1][0])
-        meeple_count = make_move(move, tt.board) 
-        tt.merchant_deck.pop()
+        #save_state = tt.save_state(move[0][0], move[-1][0])
+        meeple_count = make_move(move, tt.board, undo_stack) 
+        #tt.merchant_deck.pop()
         if(debug):
-            #print(tt)
-            print(TT)
+            print(tt)
 
         last_step = move[-1]
-        score = calc_score(last_step, meeple_count, tt)\
+        score = calc_score(last_step, meeple_count, undo_stack, tt)\
                 - minimax(depth - 1, tt)[0]
 
         #print(tt)
         #unmake_move(move, tt.board, starting_meeples, copied_end_tile)
-        unmake_move(move, *save_state) 
-        tt.load_state(save_state[0])
+
+        #unmake_move(move, *save_state) 
+        #tt.load_state(save_state[0])
+        unmake(undo_stack)
+
         #tt = save_state
         if(debug):
             print(tt)
-            print(TT)
             #print(ending_meeples)
             raw_input()
 
         if (score > max_score):
             print("better score: %s" % score)
+            #print(move)
+            #print(tt)
             max_score = score
             best_move = move
     return max_score, best_move
@@ -410,23 +537,25 @@ def alphabeta(depth, tt, net_score, alpha, beta, max_node):
     board_info = tt.board_info()
     board = board_info[0]
     best_move = []
+    undo_stack = []
     if max_node:
         v = -maxint - 1  # negative infinity
         for move in gen_moves(board_info):
             #print("max move %s: " % move)
             #starting_meeples = board[move[0][0]]['meeples']
             #copied_end_tile = copy_tile(board[move[-1][0]])
-            save_state = tt.save_state(move[0][0], move[-1][0])
-            meeple_count = make_move(move, tt.board) 
+            #save_state = tt.save_state(move[0][0], move[-1][0])
+            meeple_count = make_move(move, tt.board, undo_stack) 
 
             last_step = move[-1]
-            score = net_score + calc_score(last_step, meeple_count, tt) 
+            score = net_score + calc_score(last_step, meeple_count, undo_stack, tt) 
             #print("scored: %s" % score)
             value = alphabeta(depth - 1, tt, score, alpha, beta, False)[0]
             #print("after alphabeta: %s" % score)
 
-            unmake_move(move, *save_state) 
-            tt.load_state(save_state[0])
+            #unmake_move(move, *save_state) 
+            #tt.load_state(save_state[0])
+            unmake(undo_stack)
 
             #v = max(v, value)
             if value > v:
@@ -445,17 +574,18 @@ def alphabeta(depth, tt, net_score, alpha, beta, max_node):
             #print("min move %s: " % move)
             #starting_meeples = board[move[0][0]]['meeples']
             #copied_end_tile = copy_tile(board[move[-1][0]])
-            save_state = tt.save_state(move[0][0], move[-1][0])
-            meeple_count = make_move(move, tt.board) 
+            #save_state = tt.save_state(move[0][0], move[-1][0])
+            meeple_count = make_move(move, tt.board, undo_stack) 
 
             last_step = move[-1]
-            score = net_score - calc_score(last_step, meeple_count, tt) 
+            score = net_score - calc_score(last_step, meeple_count, undo_stack, tt) 
             #print("scored: %s" % score)
             value = alphabeta(depth - 1, tt, score, alpha, beta, True)[0]
             #print("after alphabeta: %s" % score)
 
-            unmake_move(move, *save_state) 
-            tt.load_state(save_state[0])
+            #unmake_move(move, *save_state) 
+            #tt.load_state(save_state[0])
+            unmake(undo_stack)
 
             #v = min(v, value)
             if value < v:
@@ -479,21 +609,46 @@ def copy_tile(tile):
     saved_tile['meeples'] = tile['meeples'][:] 
     return saved_tile
 
-def make_move(move, board):
-    board[move[0][0]]['meeples'] = []
+def make_move(move, board, undo_stack):
+    # start
+    start_tile = board[move[0][0]]
+    undo_stack.append((0, start_tile, 'meeples', start_tile['meeples']))
+    start_tile['meeples'] = []
 
     for idx, meeple in move[1:-1]:
+        # middles
+        undo_stack.append((1, board[idx], 'meeples'))
         board[idx]['meeples'] += meeple
 
+    # end, copy original, reference to existing
+    end_tile = board[move[-1][0]]
+    undo_stack.append((0, end_tile, 'meeples', end_tile['meeples'][:]))
     idx, meeple = move[-1]
     count = 1 # move adds a meeple
     while True:
         try:
             board[idx]['meeples'].remove(meeple)
+            #undo_stack.append((2, board[idx]['meeples'], meeple))
             count += 1
         except ValueError:
             #print("count: %s" % count)
             return count
+
+def unmake(stack):
+    # TODO make this not unintelligible, 0 = swap, 1 = pop, 2 = append
+    while stack:
+        args = stack.pop()
+        action = args[0]
+        
+        if action == 0:
+            args[1][args[2]] = args[3]
+        elif action == 1:
+            args[1][args[2]].pop() 
+        elif action == 2:
+            args[1].append(args[2])
+        else:
+            raise ValueError('Invalid action type: %s' % action)
+
 
 #def unmake_move(move, board, starting_meeples, end_tile):
 def unmake_move(move, tt, starting_meeples, end_tile):
@@ -634,32 +789,34 @@ if __name__ == '__main__':
     shuffle(TT.merchant_deck)
     TT.djinn_deck = [4]*4 + [5] + [6]*10 + [8]*5 + [10]*2
     shuffle(TT.djinn_deck)
+    n_players = 2
+    TT.player = [None]  + [{ 'coins' : 50, 
+                             'camels' : 8,
+                             'fakirs' : 0, 
+                             'viziers' : 0,
+                             'elders' : 0,
+                             'djinns' : [],
+                             'merchant_sets' : []
+                             }] * n_players
     print(TT)
-    print("Run time: %s" % (time.time() - start_time))
     print([blue_tiles(i, TT) for i in xrange(len(TT.board))])
+    print("Run time: %s" % (time.time() - start_time))
 
 
     import cProfile
     #cProfile.run('gen_moves((board, n_rows, n_cols))')
-    ply = 2
-    cProfile.run('print("best score: %d, %s" % minimax(ply, TT))')
+    ply = 3
+    #cProfile.run('print("best score: %d, %s" % minimax(ply, TT))')
     cProfile.run('print("best score: %d, %s" % alphabeta(ply, TT, 0, -maxint, maxint, True))')
 
     print(TT)
 
     # Test scaffolding
+    testing = True
     testing = False
     if (testing):
-        tt.merchant_deck = ['gold', 'ivory', 'spice']
-        tt.djinn_deck = [4,4,9]
-        copy = tt.__deepcopy__()
-        copy.n_cols = 6
-        copy.n_rows = 5
-        copy.merchant_deck.pop()
-        #copy.board[25]['meeples'] = 
-        print("Original board")
-        print(tt)
-        print("Copy")
-        print(copy)
+        print(TT.merchant_deck[:])
+        print("stuff %s " % TT['merchant_deck'])
+        
         ##print("Run time: %s" % (time.time() - start_time))   if depth == 0:
 
