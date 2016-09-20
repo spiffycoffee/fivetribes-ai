@@ -1,8 +1,8 @@
 # fivetribes-ai
-An AI for the boardgame Five Tribes. This project is a Work-in-Progress.
+An AI for the board game Five Tribes. This project is a Work-in-Progress.
 
 # Introduction
-Five Tribes is a wonderful boardgame designed by Bruno Cathala and published by Days of Wonder. 
+Five Tribes is a wonderful board game designed by Bruno Cathala and published by Days of Wonder. 
 It is a bit infamous in the board game community for causing what is know as "analysis paralysis" - 
 the inability to decide what to do on your turn because of the sheer number of options to consider. 
 Having experience some of that myself, I thought it would be fun to try to build an AI and see if it could do any better.
