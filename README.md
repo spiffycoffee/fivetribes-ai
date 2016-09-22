@@ -8,7 +8,7 @@ the inability to decide what to do on your turn because of the sheer number of o
 Having experience some of that myself, I thought it would be fun to try to build an AI and see if it could do any better.
 
 # Description
-This AI currently uses a min-maxing algorithm with alphabeta pruning. 
+This AI currently uses a minimax algorithm with alpha-beta pruning. 
 (In the future I'm interested in testing alternative approaches such as Monte-Carlo tree search.) 
 While Five Tribes can support up to a 4-player game, this AI only supports a 2-player game.
 This is because most AI approaches were only designed with 2-player games in mind 
@@ -28,8 +28,8 @@ effects completely.
 # Usage
 `python fivetribes.py`  
 This will generate a random starting board and compute the best move for Player 1.  
-To understand what is going on, it is recommended that you be familiar with the rules for Five Tribes. 
-Rules can be found [here](https://www.daysofwonder.com/five-tribes/en/#rules) for multiple languages. 
+To understand what is going on, it helps to be familiar with 
+[how to play Five Tribes.](https://www.daysofwonder.com/five-tribes/en/#rules)
 
 
 # Board Representation
